@@ -1,0 +1,31 @@
+
+[package]
+name = "realtime_chat"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix = "0.13"
+actix-web = "4"
+actix-web-actors = "4"
+actix-files = "0.6"
+uuid = { version = "1", features = ["v4"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+# rusqlite = { version = "0.29", features = ["bundled"] }
+sqlx = { version = "0.8", features = [ "sqlite", "runtime-tokio-native-tls", "macros", "chrono" ] } 
+actix-rt = "2.5.0"
+# actix-session = "0.10.1"  # Ajoute cette ligne
+actix-session = { version = "0.10", features = ["cookie-session"] }
+tera = "1.16"             # Si ce n'est pas déjà dans ton fichier           # Pour générer des UUID
+once_cell = "1.18"
+argon2 = "0.5"
+# password-hash = "0.5"
+password-hash = { version = "0.5", features = ["rand_core"] }
+rand = "0.8"
+env_logger = "0.10"
+log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+
+

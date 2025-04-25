@@ -1,0 +1,42 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Test WebSocket</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; }
+    input, button { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Client WebSocket</h1>
+  <div id="messages"></div>
+
+  <input type="text" id="input" placeholder="Tape ton message..." size="50">
+  <button onclick="sendMessage()">Envoyer</button>
+
+  <script>
+    const messagesDiv = document.getElementById("messages");
+    const input = document.getElementById("input");
+
+    const socket = new WebSocket("ws://localhost:8080/ws/");
+
+    socket.onmessage = (event) => {
+      const msg = document.createElement("div");
+      msg.textContent = "📨 " + event.data;
+      messagesDiv.appendChild(msg);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    };
+
+    function sendMessage() {
+      const text = input.value;
+      if (text) {
+        socket.send(text);
+        input.value = "";
+      }
+    }
+  </script>
+</body>
+</html>

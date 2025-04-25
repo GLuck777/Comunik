@@ -1,0 +1,69 @@
+
+
+CREATE TABLE IF NOT EXISTS users (
+    uuid TEXT PRIMARY KEY NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    pseudo TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TABLE rooms;
+DROP TABLE messages;
+DROP TABLE room_members;
+DROP TABLE friend_requests;
+DROP TABLE friendships;
+
+
+-- CREATE TABLE IF NOT EXISTS rooms (
+--   id INTEGER PRIMARY KEY AUTOINCREMENT,
+--   room_uuid TEXT NOT NULL,
+--   name TEXT NOT NULL,
+--   owner_uuid TEXT NOT NULL,
+--   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+--   FOREIGN KEY (owner_uuid) REFERENCES users (uuid)
+-- );
+CREATE TABLE IF NOT EXISTS rooms (
+  room_uuid TEXT PRIMARY KEY NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  owner_uuid TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (owner_uuid) REFERENCES users (uuid)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_uuid TEXT NOT NULL,
+  user_uuid TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (room_uuid) REFERENCES rooms (room_uuid) ON DELETE CASCADE,
+  FOREIGN KEY (user_uuid) REFERENCES users (uuid)
+);
+
+CREATE TABLE IF NOT EXISTS room_members (
+  room_uuid TEXT NOT NULL,
+  user_uuid TEXT NOT NULL,
+  role TEXT DEFAULT 'member',
+  -- created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (room_uuid, user_uuid),
+  FOREIGN KEY (room_uuid) REFERENCES rooms (room_uuid) ON DELETE CASCADE,
+  FOREIGN KEY (user_uuid) REFERENCES users (uuid)
+);
+
+CREATE TABLE IF NOT EXISTS friend_requests (
+  sender_uuid TEXT NOT NULL,
+  receiver_uuid TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (sender_uuid) REFERENCES users (uuid),
+  FOREIGN KEY (receiver_uuid) REFERENCES users (uuid)
+);
+
+CREATE TABLE IF NOT EXISTS friendships (
+  user1_uuid TEXT NOT NULL,
+  user2_uuid TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user1_uuid) REFERENCES users (uuid),
+  FOREIGN KEY (user2_uuid) REFERENCES users (uuid)
+);

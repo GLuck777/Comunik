@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accueil</title>
+  <link rel="icon" type="image/x-icon" href="/static/ressources/logoU.png">
+  <link rel="stylesheet" type="text/css" href="/static/css/style_for_all.css">
+  <link rel="stylesheet" type="text/css" href="/static/css/home.css">
+  <link rel="stylesheet" type="text/css" href="/static/css/header.css">
+  <link rel="stylesheet" type="text/css" href="/static/css/messages.css">
+</head>
+<body>
+  <header>
+    <a href="/home" class="logo"><img src="/static/ressources/logoU.png" alt="logoU"></a>
+    <div class="header-actions">
+      <div class="flex items-center space-x-2"><div class="h-2 w-2 bg-green-400 rounded-full"></div><span>Online</span></div>
+      <button class="redir" id="profil_show">
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 12.25c1.24 0 2.25-1.01 2.25-2.25S13.24 7.75 12 7.75S9.75 8.76 9.75 10s1.01 2.25 2.25 2.25m4.5 4c0-1.5-3-2.25-4.5-2.25s-4.5.75-4.5 2.25V17h9zM19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 16H5V5h14z"/>
+        </svg>
+      </button>
+      <form method="POST" action="/logout">
+        <button type="submit">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M6 2h9a2 2 0 0 1 2 2v2h-2V4H6v16h9v-2h2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2"/>
+            <path fill="currentColor" d="M16.09 15.59L17.5 17l5-5l-5-5l-1.41 1.41L18.67 11H9v2h9.67z"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </header>
+  <!-- Notification -->
+  <div class="notification-wrapper">
+    <div class="burger" onclick="toggleNotifications()">
+      <!-- Icône burger SVG -->
+      <svg width="30" height="30" viewBox="0 0 100 80" fill="white">
+        <rect width="100" height="15"></rect>
+        <rect y="30" width="100" height="15"></rect>
+        <rect y="60" width="100" height="15"></rect>
+      </svg>
+    </div>
+  
+    <div class="notifications" id="notifications">
+      <h4>Notifications</h4>
+      <ul id="notifications-list">
+
+      </ul>
+    </div>
+  </div>
+  <!-- Fin Notification -->
+  <div class="corpus_holmes">
+    <div>
+      <p>Connecté en tant que : <strong>{{ username }}</strong> ({{ email }})  {{ uuid }}</p>
+      <input type="hidden" id="uuid" value="{{ uuid }}">
+      <!-- Bouton pour ouvrir le modal -->
+      <button id="open-room-modal">Créer une Room</button>
+      <!-- Modal -->
+      <div id="room-modal" style="display:none;">
+        <div class="modal-content">
+          <h3>Créer une Room</h3>
+          <form id="create-room-form">
+            <label>Nom de la Room :</label>
+            <input type="text" name="room_name" required>
+
+            <label>Visibilité :</label>
+            <select name="visibility">
+              <option value="private">Privée</option>
+              <option value="public">Publique</option>
+            </select>
+
+            <label>Inviter des amis (UUID, séparés par des virgules) :</label>
+            <input type="text" name="invitees" placeholder="uuid1,uuid2,...">
+
+            <button type="submit">Créer</button>
+            <button type="button" id="close-room-modal">Annuler</button>
+          </form>
+        </div>
+      </div>
+      <!-- fin modale-->
+    </div>
+  </div>
+  <div class="corpus_holmes">
+    <div class="tabs">
+      <button id="btn_room" class="active-tab" onclick="showTab('room_tab')">Rooms</button>
+      <button id="btn_search" onclick="showTab('search_tab')">Recherche</button>
+    </div>
+    <!-- Onglet de recherche -->
+    <div id="search_tab" style="display: none;">
+      <div class="search_users">
+        <div class="flex items-center">
+          <input type="text" placeholder="Search users..." 
+          class="w-64 px-4 py-2 rounded-lg text-gray-900 border border-transparent focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent" value="ghfhf">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
+            class="lucide lucide-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+        </div>
+        <div class="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg overflow-hidden z-50">
+          <div class="p-4 text-gray-500 text-center">No users found</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onglet room -->
+    <div id="room_tab">
+      <div class="disp_flex">
+        <div class="aff_room">
+          <h2 class="decal_title">Room: <p id="room_name"></p></h2>
+          <div id="messages_post"> <!-- Contenant pour afficher les messages -->
+            <div class="message_content" id="message_content">
+              
+            </div>
+            <div class="message_Sender">
+              <input type="text" id="message_input" placeholder="Tapez votre message...">
+              <button class="sender_btn" onclick="sendMessage()">Envoyer</button>
+            </div>
+          </div>
+        </div>
+        <aside class="list_room">
+          <h2>Rooms disponibles :</h2>
+          {% if rooms and rooms | length > 0 %}
+              <div class="rooms_container" id="rooms_container">
+                  {% for room in rooms %}
+                      <div class="room_card" onclick="openRoom('{{ room.room_uuid }}')">
+                              <h3>{{ room.name }}</h3>
+                              <p><strong>Membres :</strong> {{ room.member_count }}</p>
+                      </div>
+                  {% endfor %}
+              </div>
+          {% else %}
+            <div class="rooms_container" id="rooms_container">
+              <p style="color: white;">Aucune room disponible.</p>
+            </div>
+          {% endif %}
+        </aside>
+      </div> <!-- fin disp_flex-->
+    </div>
+
+  </div><!-- fin de corpus_holmes-->
+</body>
+</html>
+
+<script>
+  // === WebSocket ===
+  let socket = null;
+  let currentRoomUuid = null;
+  let current_user_uuid = document.getElementById("uuid").value;
+
+  // function connectToWebSocket(path = "/ws/") {
+  //   const fullUrl = `ws://localhost:8080${path}`;
+  //   // console.log("Connecting to WebSocket at:", fullUrl);
+    
+  //   socket = new WebSocket(fullUrl);
+
+  //   socket.onopen = () => {
+  //     // console.log("Socket connecté à", fullUrl)
+  //     const roomUuid = path.replace("/ws/", "");
+  //   };
+  //   socket.onerror = (e) => console.error("Erreur WebSocket :", e);
+  //   socket.onclose = (event) => {
+  //     console.log("Socket fermé:", event);
+  //     if (event.code) console.log("Code:", event.code);
+  //     if (event.reason) console.log("Raison:", event.reason);
+  //   };
+  //   socket.onmessage = (event) => {
+  //     // console.log("🎯 Message WebSocket reçu:", event.data);
+  //     handleIncomingMessage(event.data);
+  //   };
+  // }
+  function connectToWebSocket(path = "/ws/") {
+    const fullUrl = `ws://${window.location.host}${path}`;
+    console.log("Connecting to WebSocket at:", fullUrl);
+    
+    // Close existing connection if open
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+      socket.close();
+    }
+    
+    // Create new WebSocket connection
+    socket = new WebSocket(fullUrl);
+    socketReady = false;
+    
+    socket.onopen = () => {
+      console.log("Socket connected to", fullUrl);
+      socketReady = true;
+      
+      // If connecting to a room, send join_room message
+      const roomUuid = path.replace("/ws/", "");
+      if (roomUuid) {
+        console.log("Joining room:", roomUuid);
+        currentRoomUuid = roomUuid;
+        try {
+          socket.send(JSON.stringify({ 
+          type: "join_room", 
+          room_uuid: roomUuid 
+          }));
+        } catch (e) {
+          console.error("Error sending message:", e);
+          return false;
+        }
+        // socket.send(JSON.stringify({ 
+        //   type: "join_room", 
+        //   room_uuid: roomUuid 
+        // }));
+      }
+    };
+    
+    socket.onerror = (e) => {
+      console.error("WebSocket error:", e);
+      socketReady = false;
+    };
+    
+    socket.onclose = (event) => {
+      console.log("Socket closed:", event);
+      socketReady = false;
+      if (event.code) console.log("Code:", event.code);
+      if (event.reason) console.log("Reason:", event.reason);
+      
+      // Optional: Implement reconnection after delay
+      if (event.code === 1006) {
+        console.log("Unexpected disconnect. Trying to reconnect in 5 seconds...");
+        setTimeout(() => {
+          // console.clear();
+          connectToWebSocket(path);
+        }, 5000);
+      }
+    };
+    
+    socket.onmessage = (event) => {
+      console.log("🎯 WebSocket message received:", event.data);
+      handleIncomingMessage(event.data);
+    };
+    
+    return socket;
+  }
+
+  // function openRoom(roomUuid) {
+  //   if (socket && socket.readyState === WebSocket.OPEN) {
+  //     socket.close();
+  //   }
+  //   connectToWebSocket(`/ws/${roomUuid}`);
+  //   currentRoomUuid = roomUuid;
+  //   // test
+  //   socket.onopen = function () {
+  //     socket.send(JSON.stringify({ type: "join_room", room_uuid: roomUuid }));
+  //   };
+  // }
+  function openRoom(roomUuid) {
+    if (!roomUuid) {
+      console.error("Room UUID is undefined or empty");
+      return;
+    }
+    
+    console.log("Opening room:", roomUuid);
+    connectToWebSocket(`/ws/${roomUuid}`);
+  }
+
+  // Safe send function to handle connection state
+  function safeSend(message) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      console.error("Cannot send message, socket is not open");
+      return false;
+    }
+    
+    try {
+      if (typeof message === 'object') {
+        socket.send(JSON.stringify(message));
+      } else {
+        socket.send(message);
+      }
+      return true;
+    } catch (e) {
+      console.error("Error sending message:", e);
+      return false;
+    }
+  }
+
+
+  // === Gestion des rooms ===
+  //permet d'avoir un visualisation directe de la room créée
+  function roomsContainer_filler(room){
+    // pub name: String,
+    // pub room_uuid: String,
+    // pub member_count
+    console.log("room disponible à ajouter: ", room);
+
+    const roomsContainer = document.getElementById("rooms_container");
+    const roomCards = roomsContainer.querySelectorAll('.room_card');
+
+    if (roomCards.length === 0) {
+      roomsContainer.innerHTML = ''; // ou container.remove(); si tu veux carrément supprimer le div
+    }
+
+    let divP = document.createElement("div");
+    divP.className = "room_card";
+    divP.onclick = () => openRoom(room.room_uuid);
+
+    let titleP = document.createElement("h3");
+    titleP.textContent = room.name;
+
+    let pP = document.createElement("p");
+    let strongP = document.createElement("strong");
+    strongP.textContent = "Membres : " + room.member_count;
+
+    pP.appendChild(strongP);
+    divP.appendChild(titleP);
+    divP.appendChild(pP);
+    roomsContainer.appendChild(divP);
+      // <div class="room_card" onclick="openRoom('room.room_uuid')">
+      // <h3>room.name</h3>
+      // <p><strong>Membres :</strong>room.member_count</p>
+      // </div>
+  }
+  
+  // === Gestion des messages ===
+  async function handleIncomingMessage(data) {
+    // console.log("j'entre ici dans handleIncomingMessage")
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+      console.log("parsed data:", parsed);
+    } catch (e) {
+      console.error("Erreur JSON handleIncomingMessage", e);
+      return;
+    }
+
+    switch (parsed.type) {
+      case "room_created":
+        // console.log("room_created fetch puis display")
+        const res = await fetch(`/api/notifications/${parsed.user_uuid}`);
+        const notifications = await res.json();
+        // console.log("notifications", notifications)
+        
+        displayNotifications(notifications);
+
+        // ajouter la room à la liste des rooms disponibles
+        // /api/rooms/{user_uuid}
+        const resRooms = await fetch(`/api/rooms/${parsed.room_uuid}`);
+        const list_R = await resRooms.json();
+        roomsContainer_filler(list_R)
+        break;
+      case "room_with_messages":
+        console.log("Room info:", parsed);
+        // message: "", name: "Kende", room_uuid: "74f4820a-c4bc-4e85-930b-dc18c98d6d60"
+        displayRoomMessages(parsed)
+        currentRoomUuid = parsed.room_uuid;
+        break;
+      case "new_message":
+        // en travaux
+        console.log("Room info:", parsed);
+        // messages_json: []
+        // Message envoyé au client: 
+        // {"msg":"Room et messages récupérés.","type":"room_with_messages","message":"",
+        // "name":"hggg","room_uuid":"01ea9560-49cf-4e57-b485-4e29ca6081b8","user_uuid":null}
+        const msg = data.message; // Contient un seul message ici
+        displayIncomingMessage(msg);
+        break;
+      case "error":
+        console.error("Erreur : " + parsed.message);
+        break;
+      default:
+        break;
+    }
+  }
+
+  function sendMessage() {
+    const input = document.getElementById("message_input");
+    const msg = input.value.trim();
+
+    try {
+      if (msg && socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "chat",
+        room_uuid: currentRoomUuid,
+        message: msg
+        }));
+        input.value = "";
+      }
+    } catch (e) {
+      console.error("Error sending message chat:", e);
+      return false;
+    }
+    // if (msg && socket && socket.readyState === WebSocket.OPEN) {
+    //   socket.send(JSON.stringify({
+    //     type: "chat",
+    //     room_uuid: currentRoomUuid,
+    //     message: msg
+    //   }));
+    //   input.value = "";
+    // }
+    // faire en sorte que la sall uuid soit deja enregisté en backend pour ne pas avoir à l'envoyer
+    
+  }
+  //reception de tous les messages entrant pour une room
+  function displayRoomMessages(messages) {
+    // id: 3
+    // room_uuid: "471b09c9-619f-49f8-ae29-eac44431f1d8"
+    // user_name: "jeremy"
+    // user_uuid: "94015cd7-374e-4247-9c25-0f3cb86ae049"
+    // content: "ultimatata"
+    // created_at: "24/04/2025 08:37:19"
+    console.log("=====> messages: \n", messages);
+
+    const name_room = document.getElementById("room_name");
+    let message_content = document.getElementById("message_content");
+
+    name_room.textContent = messages.name;
+    message_content.innerHTML = "";
+
+    let lastDate = "";
+
+    
+
+    messages.json.forEach(msg => {
+        const [day, month, yearWithTime] = msg.created_at.split("/");
+        const [year, time] = yearWithTime.split(" ");
+        const currentDate = `${day}/${month}/${year}`;
+        const currentTime = time;
+
+        // ➤ Si on a changé de jour : ajoute une séparation de date
+        if (currentDate !== lastDate) {
+            const dateSeparator = document.createElement("div");
+            dateSeparator.textContent = currentDate;
+            dateSeparator.classList.add("date-separator");
+            message_content.appendChild(dateSeparator);
+            lastDate = currentDate;
+        }
+
+        // ➤ Création de la div message
+        const msgDiv = document.createElement("div");
+        msgDiv.classList.add("message-block");
+        if (msg.user_uuid === current_user_uuid) {
+          msgDiv.classList.add("sent_by_me");
+        } else {
+          msgDiv.classList.add("received");
+        }
+
+        // User name
+        const nameDiv = document.createElement("div");
+        nameDiv.textContent = msg.user_name;
+        nameDiv.classList.add("user-name");
+
+        // Content
+        const contentDiv = document.createElement("div");
+        contentDiv.textContent = msg.content;
+        contentDiv.classList.add("message-content");
+
+        // Timestamp (heure)
+        const timeDiv = document.createElement("div");
+        timeDiv.textContent = currentTime;
+        timeDiv.classList.add("message-time");
+
+        // Ajoute les sous-divs au bloc principal
+        msgDiv.appendChild(nameDiv);
+        msgDiv.appendChild(contentDiv);
+        msgDiv.appendChild(timeDiv);
+
+        // Ajoute au contenu principal
+        message_content.appendChild(msgDiv);
+    });
+  }
+
+  // reception d'un message entrant provenant d'une personne inscrite dans la room
+  function displayIncomingMessage(msg) {
+    const message_content = document.getElementById("message_content");
+
+    // Séparation par date (optionnelle ici)
+    const [day, month, yearWithTime] = msg.created_at.split("/");
+    const [year, time] = yearWithTime.split(" ");
+    const currentDate = `${day}/${month}/${year}`;
+    const currentTime = time;
+
+    // ➤ Création du message
+    const msgDiv = document.createElement("div");
+    msgDiv.classList.add("message-block");
+
+    // Différencier les messages
+    if (msg.user_uuid === current_user_uuid) {
+        msgDiv.classList.add("sent-by-me");
+    } else {
+        msgDiv.classList.add("received");
+    }
+
+    // user_name
+    const nameDiv = document.createElement("div");
+    nameDiv.textContent = msg.user_name;
+    nameDiv.classList.add("user-name");
+
+    // content
+    const contentDiv = document.createElement("div");
+    contentDiv.textContent = msg.content;
+    contentDiv.classList.add("message-content");
+
+    // heure
+    const timeDiv = document.createElement("div");
+    timeDiv.textContent = currentTime;
+    timeDiv.classList.add("message-time");
+
+    // Append
+    msgDiv.appendChild(nameDiv);
+    msgDiv.appendChild(contentDiv);
+    msgDiv.appendChild(timeDiv);
+    message_content.appendChild(msgDiv);
+
+    // Scroll auto vers le bas
+    message_content.scrollTop = message_content.scrollHeight;
+  }
+
+  // === Notifications ===
+  function toggleNotifications() {
+    const notif = document.getElementById("notifications");
+    notif.style.display = notif.style.display === "block" ? "none" : "block";
+  }
+
+  function displayNotifications(notifications) {
+    const container = document.getElementById("notifications-list");
+    container.innerHTML = "";
+
+    notifications.forEach((notif) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        ${notif.message}
+        <button id="${notif.id}" onclick="deleteNotification(${notif.id})" style="margin-left:10px">❌</button>
+      `;
+      container.appendChild(li);
+    });
+  }
+  
+  async function deleteNotification(id) {
+    // console.log("Deleting notification with id:", id); // Vérifie l'ID
+    await fetch(`/api/notificationsD/${id}`, {
+      method: "DELETE",
+    });
+
+    // Re-fetch après suppression
+    displayAllNotifs()
+  }
+  
+  // fonctionne bien 
+  async function displayAllNotifs(){
+    // let user_uuid = document.getElementById("uuid").value;
+    // console.log("get_user_notifications, nouveaux notifs + uuid", user_uuid)
+    const resu = await fetch(`/api/notif/${current_user_uuid}`);
+      const notifications = await resu.json();
+      // console.log("notifs: \n",notifications)
+      displayNotifications(notifications);
+  }
+
+  // === Modale création room ===
+  function setupRoomModal() {
+    document.getElementById("open-room-modal").addEventListener("click", () => {
+      document.getElementById("room-modal").style.display = "block";
+    });
+
+    document.getElementById("close-room-modal").addEventListener("click", () => {
+      document.getElementById("room-modal").style.display = "none";
+    });
+
+    document.getElementById("create-room-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name = e.target.room_name.value;
+      const visibility = e.target.visibility.value;
+      const invitees = e.target.invitees.value.split(',').map(x => x.trim()).filter(Boolean);
+      try {
+        socket.send(JSON.stringify({
+        type: "create_room",
+        name,
+        visibility,
+        invitees
+        }));
+      } catch (e) {
+        console.error("Error sending message:", e);
+        return false;
+      }
+      // socket.send(JSON.stringify({
+      //   type: "create_room",
+      //   name,
+      //   visibility,
+      //   invitees
+      // }));
+
+      document.getElementById("room-modal").style.display = "none";
+      displayAllNotifs()
+    });
+  }
+
+  // === Tabs UI ===
+  function showTab(tabId) {
+    document.getElementById("room_tab").style.display = tabId === "room_tab" ? "block" : "none";
+    document.getElementById("search_tab").style.display = tabId === "search_tab" ? "block" : "none";
+
+    document.getElementById("btn_room").classList.toggle("active-tab", tabId === "room_tab");
+    document.getElementById("btn_search").classList.toggle("active-tab", tabId === "search_tab");
+  }
+
+  // === Init au chargement ===
+  document.addEventListener("DOMContentLoaded", () => {
+    current_user_uuid = document.getElementById("uuid")?.value;
+    // Make initial connection
+    connectToWebSocket();
+    
+    // Set up other functionality
+    if (typeof setupRoomModal === 'function') setupRoomModal();
+    if (typeof displayAllNotifs === 'function') displayAllNotifs();
+    
+    // REDIRECTION PATH
+    document.querySelectorAll(".redir").forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        redirection(button);
+      });
+    });
+    
+    function redirection(button) {
+      const id = button.id;
+      switch (id) {
+        case "profil_show":
+          window.location.href = "/profile";
+          break;
+        // Add other cases here
+        default:
+          console.log("No redirection defined for:", id);
+      }
+    }
+  }); // fin de DOMContentLoaded
+</script>

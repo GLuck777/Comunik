@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <link rel="icon" type="image/x-icon" href="/static/ressources/logoU.png">
+  <link rel="stylesheet" type="text/css" href="/static/css/style_for_all.css">
+  <link rel="stylesheet" type="text/css" href="/static/css/login.css">
+</head>
+<body>
+  <div class="access_square">
+    <h1>Connexion</h1>
+    <form method="POST" class="pass_code">
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="password" name="password" placeholder="Mot de passe" required />
+      <button type="submit">Se connecter</button>
+    </form>
+    <p>Pas de compte ? <a href="/register">Creer un compte</a></p>
+    {% if error %}
+      <p style="color:red">{{ error }}</p>
+    {% endif %}
+  </div>
+</body>
+</html>

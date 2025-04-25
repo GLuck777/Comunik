@@ -1,0 +1,261 @@
+/* Notifications */
+.notification-wrapper {
+    position: fixed;
+    top: 10vh;
+    right: 2vw;
+    z-index: 1000;
+  }
+  
+  .burger {
+    cursor: pointer;
+    background-color: #333;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s;
+  }
+  .burger:hover {
+    background-color: #444;
+  }
+  
+  .notifications {
+    display: none;
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 250px;
+    background-color: white;
+    color: black;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    overflow-y: auto;
+    max-height: 70vh;
+    min-height: fit-content;
+  }
+  
+  .notifications h4 {
+    margin-top: 0;
+  }
+  
+  .notifications ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .notifications ul li {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+/* fin notification */
+
+/* onglet pour l'affichage */
+.tabs {
+  position: absolute;
+  z-index: 2;
+  top: -2%;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  width: fit-content;
+  border-bottom: 4px solid gray;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  
+}
+.tabs button {
+  padding: 10px 20px;
+  cursor: pointer;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 6px;
+  transition: background 0.3s;
+  /* ajout pour design */
+  bottom: -3px;
+  position: relative;
+  width: 10vw;
+  border-bottom: 4px solid grey;
+}
+.tabs button.active-tab {
+  /* background-color: #2563eb; */
+  /* background-color: #01200F; */
+  /* color: white; */
+  color: black;
+  border-bottom: 4px solid black;
+}
+.disp_flex {
+  display: flex;
+  gap: 20px;
+}
+.aff_room {
+  flex: 2;
+}
+.list_room {
+  flex: 1;
+}
+/* fin onglet affichage */
+
+.corpus_holmes{
+    position: relative;
+    /* width: 99%; */
+    background-color: #9EC5AB;
+    color: black;
+    margin: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.modal-content{
+  display: flex;
+  flex-direction: column;
+  width: fit-content;
+  text-align: center;
+  background-color: #045007;
+  color: white;
+  border-radius: 8px;
+  gap: 0.5rem;
+}
+#create-room-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  word-break: break-word;
+  width: 15vw;
+  text-align: center;
+}
+#create-room-form button[type="submit"] {
+  background-color: #011502;
+  color: white;
+  font-size: large;
+  font-weight: 600;
+  padding: 0.4rem;
+  border-radius: 8px;
+  width: 60%;
+}
+#create-room-form button#close-room-modal{
+  background-color: #e73701;
+  color: white;
+  font-size: large;
+  font-weight: 600;
+  padding: 0.4rem;
+  border-radius: 8px;
+  width: 60%;
+}
+
+
+.disp_flex{
+    display: flex;
+    flex-direction: row;
+    gap: 1%;
+    margin-top: 3rem;
+}
+.aff_room{
+    position: relative;
+    width: 70%;
+    background-color: #011502;
+    color: white;
+    font-size: large;
+    font-weight: 600;
+    padding: 1rem;
+    /* height: 50vh; */
+    height: 70vh;
+    /* overflow-y: scroll; */
+    border-radius: 12px;
+}
+/* Nom de la room avec ajout */
+.decal_title{
+  position: absolute;
+  top: -6%;
+
+  display: flex;
+  gap: 1rem;
+}
+.message_post{
+  width: 100%;
+  height: 100%;
+}
+.message_content{
+  overflow-y: scroll;
+  height: 67vh;
+  background-color: #b6c7bc;
+  border-radius: 8px;
+  padding: 1rem;
+}
+.message_Sender{
+  position: absolute;
+  bottom: 2.1%;
+  height: fit-content;
+  color: #efefef;
+  width: 100%;
+}
+.message_Sender input[type="text"]{
+  width: 80%;
+  padding: 0.8rem 0.4rem;
+  border-radius: 8px;
+  
+}
+.message_Sender .sender_btn{
+  width: 15%;
+  padding: 0.8rem;
+  border-radius: 8px;
+  background-color: #e73701;
+}
+.list_room{
+    position: relative;
+    width: 25%;
+    background-color: #01200F;
+    color: white;
+    padding: 1rem;
+    /* height: 50vh; */
+    height: 70vh;
+    overflow-y: scroll;
+    border-radius: 12px;
+}
+
+/* liste des rooms */
+.rooms_container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    color: black;
+}
+
+.room_card {
+    background-color: #f0f0f0; /* Couleur de fond pour chaque carte */
+    border-radius: 15px; /* Coins arrondis */
+    padding: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Ombre pour un effet de profondeur */
+    transition: transform 0.2s ease-in-out; /* Transition douce pour l'effet de survol */
+    text-align: center;
+    cursor: pointer;
+}
+
+.room-card:hover {
+    transform: translateY(-5px); /* Effet de "flottement" lors du survol */
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15); /* Ombre plus marquée lors du survol */
+}
+
+.room-link {
+    text-decoration: none; /* Retirer le soulignement du lien */
+    color: inherit; /* Hériter de la couleur du texte */
+}
+
+.room-link h3 {
+    font-size: 1.25rem;
+    color: #333; /* Couleur du texte */
+    margin-bottom: 10px;
+}
+
+.room-link p {
+    font-size: 1rem;
+    color: #666; /* Couleur pour les informations supplémentaires */
+}
+
+/* section search user */
+.search_users{
+  height: 70vh;
+  padding: 1rem;
+}
+

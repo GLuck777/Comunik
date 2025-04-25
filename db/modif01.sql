@@ -1,0 +1,9 @@
+DROP TABLE notifications;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_uuid TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_uuid) REFERENCES users(uuid)
+);

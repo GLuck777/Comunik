@@ -1,0 +1,54 @@
+header{
+    position: relative;
+    /* height: 6vh; */
+    height: 10vh;
+    display: flex;
+    flex-direction: row;
+    background-color: #9EC5AB;
+    border-left: 0.2rem solid black;
+    border-bottom: 0.2rem solid black;
+    align-items: center;
+    justify-content: space-between;padding: 0 1rem;
+    padding: 0 1rem;
+}
+header img{
+    /* height: 6vh; */
+    height: 100%;
+}
+header .logo{
+    height: 100%;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem; /* Espacement entre le bouton et le formulaire */
+    height: 100%;
+}
+/* tout ça pour le connecté en vert */
+.flex{
+    display: flex;
+} 
+.items-center {
+    align-items: center;
+}
+.space-x-2{
+    gap: 0.5rem;
+}
+.bg-green-400 {
+    --tw-bg-opacity: 1;
+    background-color: rgb(74 222 128 / var(--tw-bg-opacity));
+    animation: lumi 1s infinite;
+    background-color: rgb(47, 146, 83);
+}
+@keyframes lumi {
+    from { background-color: rgb(74 222 128 / var(--tw-bg-opacity)); }
+    to   { background-color: rgb(47 146 83 / var(--tw-bg-opacity)); }
+}
+/* linear-gradient(to right, #009246 0%, #009246 100%) */
+
+.rounded-full{
+    border-radius: 9999px;
+    width: .5rem;
+    height: .5rem;
+}
