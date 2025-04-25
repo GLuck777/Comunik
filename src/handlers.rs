@@ -1,4 +1,6 @@
 // use tools::*;
+use crate::sql_req::*;
+
 use actix_web::{web, HttpResponse, Responder};
 use actix_session::Session;
 use serde::{Serialize, Deserialize};
@@ -156,7 +158,11 @@ pub async fn login_post(
 
                             println!("Utilisateur connecté : {} ({}) - uuid: {}", pseudo, email, uuid);
 
-                            return render("home.html", ctx);
+                            // return render("home.html", ctx);
+                            return HttpResponse::Found()
+                            .append_header(("Location", "/home"))
+                            .finish();
+                            
                         }
                     }
                     Err(_) => {}
@@ -235,7 +241,10 @@ pub async fn register_post(
 
                 println!("Utilisateur connecté : {} ({})", pseudo, &form.email.clone());
 
-                return render("home.html", ctx);
+                // return render("home.html", ctx);
+                return HttpResponse::Found()
+                            .append_header(("Location", "/home"))
+                            .finish();
         },
         Err(e) => HttpResponse::InternalServerError().body(format!("Erreur DB: {}", e)),
     }
@@ -247,38 +256,20 @@ pub async fn logout(session: Session) -> impl Responder {
     HttpResponse::Found().append_header(("Location", "/login")).finish()
 }
 
-// pub async fn home(session: Session) -> impl Responder {
-//     // println!("Session UUID: {:?}", session.get::<String>("uuid").unwrap_or(None));
-//     if let Ok(Some(uuid)) = session.get::<String>("uuid") {
-//         println!("Session UUID: {}", uuid);
-//         // continue vers page home
-//         let email = session.get::<String>("email").unwrap_or(None).unwrap_or_default();
-//         let username = session.get::<String>("pseudo").unwrap_or(None).unwrap_or_default();
-//         let uuid = session.get::<String>("uuid").unwrap_or(None).unwrap_or_default();
-
-//         let mut ctx = Context::new();
-//         ctx.insert("email", &email);
-//         ctx.insert("username", &username);
-//         ctx.insert("uuid", &uuid);
-
-//         render("home.html", ctx)
-//     } else {
-//         println!("Pas de session. Redirection vers /login.");
-//         return HttpResponse::Found()
-//             .append_header(("Location", "/login"))
-//             .finish();
-//     }
-// }
 pub async fn home(session: Session, pool: web::Data<SqlitePool>) -> impl Responder {
     if let Ok(Some(uuid)) = session.get::<String>("uuid") {
         let email = session.get::<String>("email").unwrap_or(None).unwrap_or_default();
-        let username = session.get::<String>("pseudo").unwrap_or(None).unwrap_or_default();
+        let usernamebis = session.get::<String>("pseudo").unwrap_or(None).unwrap_or_default();
+        let username = match get_user_name(&pool, &uuid).await{
+            Ok(name) => name,
+            Err(_) => usernamebis,
+        };
 
         // Récupérer les rooms associées à cet utilisateur
         let rooms = get_rooms_for_user(&pool, &uuid).await.unwrap_or_else(|_| Vec::new());
 
         // Vérifier le contenu de rooms avant d'envoyer aux templates
-        println!("Rooms: {:?}", rooms); // Affiche les rooms dans le terminal
+        println!("\n\tRooms: {:?}", rooms); // Affiche les rooms dans le terminal
 
 
         // Insérer dans le contexte Tera
@@ -295,7 +286,7 @@ pub async fn home(session: Session, pool: web::Data<SqlitePool>) -> impl Respond
 }
 
 async fn get_rooms_for_user(pool: &web::Data<SqlitePool>, user_uuid: &str) -> Result<Vec<Rooms>, sqlx::Error> {
-    
+    println!("\n\tj'entre dans get_rooms_for_user\n");
     
     let rooms = sqlx::query_as::<_, Rooms>(
         "SELECT r.id, r.room_uuid, r.name, r.owner_uuid, r.created_at, 

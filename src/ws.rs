@@ -7,7 +7,7 @@ use crate::other_ws::WebsocketContext;
 
 use actix_web_actors::ws;
 use serde::{Deserialize, Serialize};
-use sqlx::{SqlitePool};
+use sqlx::{Any, SqlitePool};
 use crate::sql_req::*; // Assurez-vous que la fonction est correctement importée
 use tokio::spawn;
 use serde_json::Value;
@@ -95,7 +95,7 @@ impl Handler<MyMessage> for MyWebSocket {
 #[serde(tag = "type")]
 pub enum ClientMessage {
     #[serde(rename = "create_room")]
-    CreateRoom { name: String, visibility: String },
+    CreateRoom { name: String, visibility: String, invitees: Vec<String>, },
 
     #[serde(rename = "chat")]
     Chat { room_uuid: String, message: String },
@@ -120,9 +120,10 @@ pub struct ServerMessage {
 
 #[derive(Debug)]
 pub struct MyWebSocket {
-    pub db_pool: Arc<Mutex<SqlitePool>>,
+    pub db_pool: SqlitePool,
+    // pub db_pool: Arc<Mutex<SqlitePool>>,
     pub user_uuid: String,
-    pub room_uuid: Option<String>, // <- new
+    pub room_uuid: Option<String>,
     pub rooms: Arc<Mutex<HashMap<Uuid, broadcast::Sender<ServerMessage>>>>,
 }
 pub struct BroadcastMessage {
@@ -141,11 +142,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
         println!("websocket start!");
         if let Ok(ws::Message::Text(text)) = msg {
             match serde_json::from_str::<ClientMessage>(&text) {
-                Ok(ClientMessage::CreateRoom { name, visibility }) => {
+                Ok(ClientMessage::CreateRoom { name, visibility, invitees }) => {
                     println!("create_room, name: {}", name);
                     
                     // Clone necessary data
-                    let pool = Arc::clone(&self.db_pool);
+                    // let pool: Arc<Mutex<SqlitePool>> = Arc::clone(&self.db_pool);
+                    let pool = self.db_pool.clone();
                     let uuid = self.user_uuid.clone();
                     let name_clone = name.clone();
                     let visibility_clone = visibility.clone();
@@ -153,14 +155,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     
                     // Create a future for room creation
                     let fut = async move {
-                        // Get clean database connection
-                        let db_pool = {
-                            let guard = pool.lock().unwrap();
-                            guard.clone() // Clone the pool, not the guard
-                        };
                         
                         // Try to create the room
-                        let result = create_room_in_db(&db_pool, &name_clone, &visibility_clone, &uuid, &[]).await;
+                        let result = create_room_in_db(&pool, &name_clone, &visibility_clone, &uuid, &invitees).await; //&[]
                         
                         match result {
                             Ok(room_uuid) => {
@@ -219,10 +216,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     );
                 }
                 Ok(ClientMessage::GetRoomData { room_uuid }) => {
-                    println!("Récupération de la room et des messages: {:?}", room_uuid);
+                    println!("\n\nRécupération de la room et des messages: {:?}\n\n", room_uuid);
                     
                     // Clone necessary data
-                    let pool = Arc::clone(&self.db_pool);
+                    // let pool: Arc<Mutex<SqlitePool>> = Arc::clone(&self.db_pool);
+                    let pool = self.db_pool.clone();
                     let ctx_addr = ctx.address();
                     let room_uuid_clone = room_uuid.clone();
                     let rooms = Arc::clone(&self.rooms);
@@ -233,10 +231,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     // Create a future to handle room data retrieval
                     let fut = async move {
                         // Get a clean database connection from the pool
-                        let db_pool = {
-                            let guard = pool.lock().unwrap();
-                            guard.clone() // Clone the pool, not the guard
-                        };
+                        // let db_pool = {
+                        //     let guard = pool.lock().unwrap();
+                        //     guard.clone() // Clone the pool, not the guard
+                        // };
+                        // let db_pool = pool.lock().expect("Failed to lock db_pool").clone();
+
                         
                         // Try to parse the UUID
                         match Uuid::parse_str(&room_uuid_clone) {
@@ -248,7 +248,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                 };
                                 
                                 // Get room and message data
-                                match get_room_with_messages(&db_pool, &room_uuid_clone).await {
+                                match get_room_with_messages(&pool, &room_uuid_clone).await {
                                     Ok((room, messages)) => {
                                         let message_json = serde_json::to_value(&messages).unwrap_or(json!([]));
                                         let server_msg = ServerMessage {
@@ -342,7 +342,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     println!("Message dans room {:?}: {}", room_uuid, message);
                 
                     // Clone all necessary data before moving into async context
-                    let pool = Arc::clone(&self.db_pool);
+                    // let pool: Arc<Mutex<SqlitePool>> = Arc::clone(&self.db_pool);
+                    let pool = self.db_pool.clone();
                     let uuid = self.user_uuid.clone();
                     let room_uuid_clone = room_uuid.clone();
                     
@@ -358,13 +359,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                             // Create a future to handle the database operations
                             let fut = async move {
                                 // Important: Lock the pool briefly just to get a connection
-                                let db_pool = {
-                                    let guard = pool.lock().unwrap();
-                                    guard.clone() // Clone the pool itself, not the guard
-                                };
+                                // let db_pool = {
+                                //     let guard = pool.lock().unwrap();
+                                //     guard.clone() // Clone the pool itself, not the guard
+                                // };
                                 
                                 // Check if user is in room - with proper error handling
-                                let is_member = match is_user_in_room(&db_pool, &room_uuid_clone, &uuid).await {
+                                let is_member = match is_user_in_room(&pool, &room_uuid_clone, &uuid).await {
                                     Ok(result) => result,
                                     Err(e) => {
                                         eprintln!("Error checking room membership: {:?}", e);
@@ -393,7 +394,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                 }
                 
                                 // Insert message
-                                if let Err(e) = insert_message(&db_pool, &room_uuid_clone, &uuid, &message).await {
+                                if let Err(e) = insert_message(&pool, &room_uuid_clone, &uuid, &message).await {
                                     eprintln!("Error inserting message: {:?}", e);
                                     return ServerMessage {
                                         msg: "Failed to save message".into(),
@@ -407,7 +408,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                 }
                 
                                 // Get user name
-                                let user_name = match get_user_name(&db_pool, &uuid).await {
+                                let user_name = match get_user_name(&pool, &uuid).await {
                                     Ok(name) => name,
                                     Err(_) => "Anonymous".into(),
                                 };
@@ -449,8 +450,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                         }
                 
                                         // Also confirm to the sender
-                                        let json = serde_json::to_string(&server_msg).unwrap_or_default();
-                                        ctx.text(json);
+                                        // let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                                        // ctx.text(json);
                                     }),
                             );
                         },

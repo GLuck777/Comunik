@@ -1,4 +1,9 @@
 
+DROP TABLE rooms;
+DROP TABLE messages;
+DROP TABLE room_members;
+DROP TABLE friend_requests;
+DROP TABLE friendships;
 
 CREATE TABLE IF NOT EXISTS users (
     uuid TEXT PRIMARY KEY NOT NULL UNIQUE,
@@ -8,21 +13,6 @@ CREATE TABLE IF NOT EXISTS users (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-DROP TABLE rooms;
-DROP TABLE messages;
-DROP TABLE room_members;
-DROP TABLE friend_requests;
-DROP TABLE friendships;
-
-
--- CREATE TABLE IF NOT EXISTS rooms (
---   id INTEGER PRIMARY KEY AUTOINCREMENT,
---   room_uuid TEXT NOT NULL,
---   name TEXT NOT NULL,
---   owner_uuid TEXT NOT NULL,
---   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
---   FOREIGN KEY (owner_uuid) REFERENCES users (uuid)
--- );
 CREATE TABLE IF NOT EXISTS rooms (
   room_uuid TEXT PRIMARY KEY NOT NULL UNIQUE,
   name TEXT NOT NULL,

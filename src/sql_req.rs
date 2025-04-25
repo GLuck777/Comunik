@@ -8,7 +8,7 @@ pub async fn create_room_in_db(
     name: &str,
     visibility: &str,
     owner_uuid: &str,
-    invitees: &[String],
+    invitees: &[String], // Vec<String>
 ) -> Result<String, Error> {
     let room_uuid = Uuid::new_v4().to_string();
     println!(
@@ -46,8 +46,10 @@ pub async fn create_room_in_db(
     // Collecte les UUIDs pour les notifications
     let mut notification_receivers: Vec<String> = vec![owner_uuid.to_string()];
 
+    println!("######################### invitées {:?}", invitees);
     for invitee in invitees {
-        if let Some(row) = sqlx::query("SELECT uuid FROM users WHERE email = ? OR pseudo = ?")
+        if let Some(row) = sqlx::query("SELECT uuid FROM users WHERE LOWER(email) = LOWER(?) OR LOWER(pseudo) = LOWER(?) OR LOWER(uuid) = LOWER(?)")
+            .bind(invitee)
             .bind(invitee)
             .bind(invitee)
             .fetch_optional(pool)
@@ -65,7 +67,7 @@ pub async fn create_room_in_db(
             .await;
 
             if let Err(e) = result {
-                println!("Erreur lors de l'insertion dans room_members: {:?}", e);
+                println!("\n\n\tErreur lors de l'insertion dans room_members pour les invitées!!!!: {:?}", e);
                 return Err(e);
             }
 
@@ -166,7 +168,7 @@ pub async fn get_room_with_messages(
     pool: &SqlitePool,
     room_uuid: &str,
 ) -> Result<(Room, Vec<MessageWithUser>), sqlx::Error> {
-    println!("get_room_with_messages demarrage du loading");
+    // println!("get_room_with_messages demarrage du loading");
     println!("Chargement des messages pour room_uuid = {}", room_uuid);
 
     let room_result = sqlx::query_as::<_, Room>(
@@ -214,10 +216,11 @@ pub async fn get_room_with_messages(
             return Err(e);
         }
     };
-    println!("Messages reçu par le serveur\n {:?}", messages);
+    // println!("Messages reçu par le serveur\n {:?}", messages);
     Ok((room, messages))
 }
 
+// Verifie si l'utilisateur appartient à la room
 pub async fn is_user_in_room(pool: &sqlx::SqlitePool, room_uuid: &str, user_uuid: &str) -> Result<bool, sqlx::Error> {
     println!("is_user_in_room ?");
     let count: (i64,) = sqlx::query_as(
@@ -238,6 +241,7 @@ pub async fn is_user_in_room(pool: &sqlx::SqlitePool, room_uuid: &str, user_uuid
     Ok(count.0 > 0)
 }
 
+// ajoute un message dans une room pour un utilisateur
 pub async fn insert_message(
     pool: &SqlitePool,
     room_uuid: &str,
@@ -263,10 +267,12 @@ pub async fn insert_message(
     Ok(())
 }
 
+
+//Recupère le nom de l'utilisateur grace à son uuid
 pub async fn get_user_name(pool: &sqlx::SqlitePool, user_uuid: &str) -> Result<String, sqlx::Error>  {
     println!("is_user_in_room ?");
     let pseudo: (String,) = sqlx::query_as(
-        "SELECT pseudo FROM users WHERE user_uuid = ?"
+        "SELECT pseudo FROM users WHERE uuid = ?"
     )
     .bind(user_uuid)
     .fetch_one(pool)
@@ -278,7 +284,7 @@ pub async fn get_user_name(pool: &sqlx::SqlitePool, user_uuid: &str) -> Result<S
     //     );
     // }
 
-    println!("============> true or false: {}", pseudo.0);
+    println!("============> pseudo true or false: {}", pseudo.0);
     Ok(pseudo.0)
 }
 

@@ -177,10 +177,10 @@
 }
 .message_content{
   overflow-y: scroll;
-  height: 67vh;
+  height: 60vh;
   background-color: #b6c7bc;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 1rem 1rem 4rem 1rem;
 }
 .message_Sender{
   position: absolute;
@@ -215,9 +215,13 @@
 
 /* liste des rooms */
 .rooms_container {
-    display: grid;
+    /* display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 20px;
+    padding: 20px;
+    color: black; */
+    display: grid;
+    gap: 1rem;
     padding: 20px;
     color: black;
 }
@@ -232,9 +236,10 @@
     cursor: pointer;
 }
 
-.room-card:hover {
+.room_card:hover {
     transform: translateY(-5px); /* Effet de "flottement" lors du survol */
     box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15); /* Ombre plus marquée lors du survol */
+    background-color: #9EC5AB;
 }
 
 .room-link {

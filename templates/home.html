@@ -187,24 +187,16 @@
       socketReady = true;
       
       // If connecting to a room, send join_room message
-      const roomUuid = path.replace("/ws/", "");
-      if (roomUuid) {
-        console.log("Joining room:", roomUuid);
-        currentRoomUuid = roomUuid;
-        try {
-          socket.send(JSON.stringify({ 
-          type: "join_room", 
-          room_uuid: roomUuid 
-          }));
-        } catch (e) {
-          console.error("Error sending message:", e);
-          return false;
-        }
+      // const roomUuid = path.replace("/ws/", "");
+      // if (roomUuid) {
+      //   console.log("Joining room:", roomUuid);
+      //   currentRoomUuid = roomUuid;
+        
         // socket.send(JSON.stringify({ 
         //   type: "join_room", 
         //   room_uuid: roomUuid 
         // }));
-      }
+      // }
     };
     
     socket.onerror = (e) => {
@@ -221,10 +213,10 @@
       // Optional: Implement reconnection after delay
       if (event.code === 1006) {
         console.log("Unexpected disconnect. Trying to reconnect in 5 seconds...");
-        setTimeout(() => {
+        // setTimeout(() => {
           // console.clear();
-          connectToWebSocket(path);
-        }, 5000);
+          // connectToWebSocket(path);
+        // }, 5000);
       }
     };
     
@@ -247,14 +239,26 @@
   //     socket.send(JSON.stringify({ type: "join_room", room_uuid: roomUuid }));
   //   };
   // }
-  function openRoom(roomUuid) {
+  async function openRoom(roomUuid) {
     if (!roomUuid) {
       console.error("Room UUID is undefined or empty");
       return;
     }
     
     console.log("Opening room:", roomUuid);
-    connectToWebSocket(`/ws/${roomUuid}`);
+    await connectToWebSocket(`/ws/${roomUuid}`);
+    currentRoomUuid = roomUuid;
+    socket.onopen = () => {
+      try {
+        socket.send(JSON.stringify({ 
+        type: "join_room", 
+        room_uuid: currentRoomUuid 
+        }));
+      } catch (e) {
+        console.error("Error opening room:", e);
+        return false;
+      }
+    }
   }
 
   // Safe send function to handle connection state
@@ -349,13 +353,14 @@
         break;
       case "new_message":
         // en travaux
-        console.log("Room info:", parsed);
+        console.log("\n\n\nWOWOWOWOOWOWOWOWOWO Room info:\n\t", parsed);
         // messages_json: []
         // Message envoyé au client: 
         // {"msg":"Room et messages récupérés.","type":"room_with_messages","message":"",
         // "name":"hggg","room_uuid":"01ea9560-49cf-4e57-b485-4e29ca6081b8","user_uuid":null}
-        const msg = data.message; // Contient un seul message ici
-        displayIncomingMessage(msg);
+          // const msg = data.message; // Contient un seul message ici
+          const msg = parsed; // Contient un seul message ici
+          displayIncomingMessage(msg);
         break;
       case "error":
         console.error("Erreur : " + parsed.message);
@@ -464,33 +469,49 @@
 
   // reception d'un message entrant provenant d'une personne inscrite dans la room
   function displayIncomingMessage(msg) {
+    console.log("==> display_IncomingMessage!", msg)
+    // msg: "Nouveau message",
+    // type: "new_message",
+    // message: "reseteur je t'aime épouse moi !",
+    // name: "Anonymous",
+    // room_uuid: "471b09c9-619f-49f8-ae29-eac44431f1d8",
+    // user_uuid: "94015cd7-374e-4247-9c25-0f3cb86ae049",
+    // json: {
+    //   content: "reseteur je t'aime épouse moi !",
+    //   created_at: "25/04/2025 10:40:28",
+    //   user_name: "Anonymous",
+    //   user_uuid: "94015cd7-374e-4247-9c25-0f3cb86ae049"
+    // }
     const message_content = document.getElementById("message_content");
 
+    const json = msg.json;
+
+    // Vérifie que les champs existent
+    if (!json || !json.created_at || !json.user_name || !json.content) {
+        console.warn("⚠️ Données de message invalides :", json);
+        return;
+    }
+
     // Séparation par date (optionnelle ici)
-    const [day, month, yearWithTime] = msg.created_at.split("/");
+    const [day, month, yearWithTime] = json.created_at.split("/");
     const [year, time] = yearWithTime.split(" ");
     const currentDate = `${day}/${month}/${year}`;
     const currentTime = time;
 
     // ➤ Création du message
+    // Création du bloc message
     const msgDiv = document.createElement("div");
     msgDiv.classList.add("message-block");
-
-    // Différencier les messages
-    if (msg.user_uuid === current_user_uuid) {
-        msgDiv.classList.add("sent-by-me");
-    } else {
-        msgDiv.classList.add("received");
-    }
+    msgDiv.classList.add(msg.user_uuid === current_user_uuid ? "sent-by-me" : "received");
 
     // user_name
     const nameDiv = document.createElement("div");
-    nameDiv.textContent = msg.user_name;
+    nameDiv.textContent = msg.json.user_name;
     nameDiv.classList.add("user-name");
 
     // content
     const contentDiv = document.createElement("div");
-    contentDiv.textContent = msg.content;
+    contentDiv.textContent = msg.json.content;
     contentDiv.classList.add("message-content");
 
     // heure

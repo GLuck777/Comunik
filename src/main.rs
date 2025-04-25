@@ -27,6 +27,7 @@ use uuid::Uuid;
 use tokio::sync::broadcast;
 use crate::ws::ServerMessage;
 
+#[derive(Debug, Clone)]
 pub struct AppState {
     db_pool: SqlitePool,
     rooms: Arc<Mutex<HashMap<Uuid, broadcast::Sender<ServerMessage>>>>,
@@ -37,29 +38,32 @@ pub struct AppState {
 pub async fn websocket_handler(
     req: HttpRequest, 
     stream: web::Payload, 
-    session: Session, 
+    session: Session,
     app_state: web::Data<AppState>,
-    path: Option<web::Path<String>>
-) -> Result<HttpResponse, actix_web::Error> {
-    // Extract room UUID from path if present
+    // pool: web::Data<SqlitePool>,
+    path: Option<web::Path<String>> // <- ici
+) -> Result<HttpResponse, actix_web::Error> { //ajout: pool: web::Data<SqlitePool>
+    // other_ws::start(ws::MyWebSocket { db_pool: pool.get_ref().clone() }, &req, stream)
+    println!(r"\x1b[0;31m debut de test \x1b[0m");
     let room_uuid = path.map(|p| p.into_inner());
-    
-    // Check for user session
+    println!(r"\x1b[0;31m deuxieme partie de test \x1b[0m");
     if let Some(uuid) = session.get::<String>("uuid")? {
-        // Initialize WebSocket with all required fields
+        println!(r"\x1b[0;31m troisieme partie de test \x1b[0m");
         let ws = ws::MyWebSocket {
-            db_pool: Arc::new(Mutex::new(app_state.db_pool.clone())),
+            db_pool: app_state.db_pool.clone(),
             user_uuid: uuid,
             room_uuid,
             rooms: Arc::clone(&app_state.rooms),
         };
-        
-        // Start WebSocket connection
+        println!(r"\x1b[0;31m quatrieme partie de test \x1b[0m");
         other_ws::start(ws, &req, stream)
     } else {
+        println!(r"\x1b[0;31m cinquieme partie de test \x1b[0m");
         Err(actix_web::error::ErrorUnauthorized("No UUID in session"))
     }
+    // other_ws::start(ws::MyWebSocket {}, &req, stream) // ancienne version sans pool
 }
+
 
 use once_cell::sync::Lazy;
 
@@ -100,10 +104,15 @@ async fn main() -> std::io::Result<()> {
     if let Err(e) = ws_init::initialize_rooms(&pool, &rooms).await {
         eprintln!("Failed to initialize rooms: {}", e);
     }
+    let app_state = AppState {
+        db_pool: pool.clone(),
+        rooms: rooms.clone(),
+    };
 
     HttpServer::new(move|| {
         
         App::new()
+            .app_data(web::Data::new(app_state.clone()))
             .app_data(web::Data::new(pool.clone()))
             .wrap(SessionMiddleware::builder(
                 CookieSessionStore::default(),
