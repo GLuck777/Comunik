@@ -1,6 +1,6 @@
 
 [package]
-name = "realtime_chat"
+name = "social_network_comunik"
 version = "0.1.0"
 edition = "2021"
 

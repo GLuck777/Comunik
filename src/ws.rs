@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 struct Server {
+    // pub sessions: Arc<Mutex<HashMap<Uuid, Recipient<ServerMessage>>>>,
     rooms: Arc<Mutex<HashMap<Uuid, broadcast::Sender<ServerMessage>>>>,
 
 }
@@ -103,6 +104,11 @@ pub enum ClientMessage {
     #[serde(rename = "join_room")]
     GetRoomData { room_uuid: String },
 
+    #[serde(rename = "fetch_users")]
+    GetUsersData {},
+
+
+
     // À étendre : join_room, invite_user, etc.
 }
 
@@ -142,6 +148,21 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
         println!("websocket start!");
         if let Ok(ws::Message::Text(text)) = msg {
             match serde_json::from_str::<ClientMessage>(&text) {
+                // Exemple
+                // Ok(ClientMessage::Chat { room_uuid, message }) => {
+                //     println!("Message dans room {:?}: {}", room_uuid, message);
+                //     let pool = self.db_pool.clone();
+                //     let uuid = self.user_uuid.clone();
+                //     // 💡 vérifie si self.uuid est membre de la room avant d'enregistrer
+                //     if is_user_in_room(&pool, &room_uuid, &uuid).await? {
+                //         insert_message(&pool, &room_uuid, &uuid, &message).await?;
+                //         // éventuellement broadcast aux autres
+                //     } else {
+                //         println!("User {:?} n'est pas membre de la room {:?}", uuid, room_uuid);
+                //         // tu peux aussi renvoyer un message d'erreur au client
+                //     }
+                // }
+
                 Ok(ClientMessage::CreateRoom { name, visibility, invitees }) => {
                     println!("create_room, name: {}", name);
                     
@@ -151,69 +172,93 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     let uuid = self.user_uuid.clone();
                     let name_clone = name.clone();
                     let visibility_clone = visibility.clone();
+                    let invitees_clone = invitees.clone();
                     let rooms = Arc::clone(&self.rooms);
+                    let addr = ctx.address(); // Pour interagir avec ctx sans capturer self
                     
                     // Create a future for room creation
                     let fut = async move {
+                        let mut sender_opt = None;
+                    
+                        let result = create_room_in_db(&pool, &name_clone, &visibility_clone, &uuid, &invitees_clone).await;
                         
-                        // Try to create the room
-                        let result = create_room_in_db(&pool, &name_clone, &visibility_clone, &uuid, &invitees).await; //&[]
-                        
-                        match result {
+                        let server_msg = match result {
                             Ok(room_uuid) => {
-                                // Try to parse the UUID
                                 match Uuid::parse_str(&room_uuid) {
                                     Ok(room_uuid_parsed) => {
-                                        // Create a broadcast channel for this room
                                         let (tx, _rx) = broadcast::channel(100);
                                         
-                                        // Add to room mapping
                                         {
                                             let mut rooms_guard = rooms.lock().unwrap();
-                                            rooms_guard.insert(room_uuid_parsed, tx);
+                                            rooms_guard.insert(room_uuid_parsed, tx.clone());
                                         }
-                                        
-                                        // Create success message
-                                        ServerMessage {
+                    
+                                        // Enregistrer le sender
+                                        sender_opt = Some(tx.clone());
+                    
+                                        // Envoi aux invités
+                                        let server_msg = ServerMessage {
                                             msg: format!("Room '{}' créée avec succès par {}", name_clone, uuid),
                                             r#type: "room_created".to_string(),
                                             message: format!("Room '{}' créée avec succès par {}", name_clone, uuid),
                                             name: Some(name_clone),
-                                            room_uuid: Some(room_uuid),
-                                            user_uuid: Some(uuid),
+                                            room_uuid: Some(room_uuid.clone()),
+                                            user_uuid: Some(uuid.clone()),
                                             json: None,
+                                        };
+                    
+                                        // Envoi aux utilisateurs
+                                        if let Some(sender) = sender_opt.clone() {
+                                            let user_uuids = get_room_user_uuids(&pool, &room_uuid).await.unwrap_or_default();
+                                            for _ in user_uuids {
+                                                let _ = sender.send(server_msg.clone());
+                                            }
                                         }
-                                    },
+                    
+                                        server_msg
+                                    }
                                     Err(_) => ServerMessage {
-                                        msg: "Erreur de format UUID pour la room créée".to_string(),
+                                        msg: "Erreur de format UUID".to_string(),
                                         r#type: "error".to_string(),
-                                        message: "Le format de l'UUID retourné est invalide".to_string(),
+                                        message: "UUID invalide retourné".to_string(),
                                         name: None,
                                         room_uuid: None,
                                         user_uuid: None,
-                                        json: None
+                                        json: None,
                                     },
                                 }
-                            },
+                            }
                             Err(e) => ServerMessage {
-                                msg: "Erreur lors de la création de la room.".to_string(),
+                                msg: "Erreur création room".to_string(),
                                 r#type: "error".to_string(),
-                                message: format!("Database error: {}", e),
+                                message: format!("Erreur BDD: {}", e),
                                 name: None,
                                 room_uuid: None,
                                 user_uuid: None,
-                                json: None
+                                json: None,
                             },
-                        }
-                    };
+                        };
                     
-                    // Handle the future
+                        (server_msg, sender_opt)
+                    };
                     ctx.spawn(
-                        fut::wrap_future(fut).map(|msg, _, ctx: &mut WebsocketContext<MyWebSocket>| {
-                            let json = serde_json::to_string(&msg).unwrap_or_default();
+                        fut::wrap_future(fut).map(move |(server_msg, sender_opt), _, ctx: &mut WebsocketContext<MyWebSocket>| {
+                            if let Some(sender) = sender_opt {
+                                let _ = sender.send(server_msg.clone());
+                            }
+                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
                             ctx.text(json);
                         }),
                     );
+                    // ctx.spawn(
+                    //     fut::wrap_future(fut).map(|(server_msg, sender_opt), _, ctx: &mut WebsocketContext<MyWebSocket>| {
+                    //         if let Some(sender) = sender_opt {
+                    //             let _ = sender.send(server_msg.clone());
+                    //         }
+                    //         let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                    //         ctx.text(json);
+                    //     }),
+                    // );
                 }
                 Ok(ClientMessage::GetRoomData { room_uuid }) => {
                     println!("\n\nRécupération de la room et des messages: {:?}\n\n", room_uuid);
@@ -242,8 +287,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                         match Uuid::parse_str(&room_uuid_clone) {
                             Ok(room_uuid_parsed) => {
                                 // Check if the room exists in our mapping
-                                let sender_opt = {
-                                    let rooms_guard = rooms.lock().unwrap();
+                                let sender_opt: Option<broadcast::Sender<ServerMessage>> = {
+                                    let rooms_guard: std::sync::MutexGuard<'_, HashMap<Uuid, broadcast::Sender<ServerMessage>>> = rooms.lock().unwrap();
                                     rooms_guard.get(&room_uuid_parsed).cloned()
                                 };
                                 
@@ -323,21 +368,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                             }),
                     );
                 }
-
-                // Ok(ClientMessage::Chat { room_uuid, message }) => {
-                //     println!("Message dans room {:?}: {}", room_uuid, message);
-                //     let pool = self.db_pool.clone();
-                //     let uuid = self.user_uuid.clone();
-                //     // 💡 vérifie si self.uuid est membre de la room avant d'enregistrer
-                //     if is_user_in_room(&pool, &room_uuid, &uuid).await? {
-                //         insert_message(&pool, &room_uuid, &uuid, &message).await?;
-                //         // éventuellement broadcast aux autres
-                //     } else {
-                //         println!("User {:?} n'est pas membre de la room {:?}", uuid, room_uuid);
-                //         // tu peux aussi renvoyer un message d'erreur au client
-                //     }
-                // }
-
                 Ok(ClientMessage::Chat { room_uuid, message }) => {
                     println!("Message dans room {:?}: {}", room_uuid, message);
                 
@@ -470,11 +500,71 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                         }
                     }
                 }
-                // _ => {}
+                Ok(ClientMessage::GetUsersData{}) => {
+                    println!("\n\n\n\nRécupération des utilisateurs pour:\n\n\n\n");
+                    let pool = self.db_pool.clone();
+                    let user_uuid = self.user_uuid.clone();
+                    let mut username = "Anonyme".to_string();
+
+                    let fut = async move {
+
+                        if user_uuid.clone() != "" {
+                            if let Ok(name) = get_user_name(&pool, &user_uuid).await {
+                                username = name;
+                            }
+                        };
+                        match get_list_users(&pool, username).await {
+                            Ok(list_users) => {
+                                let message_json = serde_json::to_value(&list_users).unwrap_or(json!([]));
+                                let server_msg = ServerMessage {
+                                    msg: "Utilisateurs récupérés.".to_string(),
+                                    r#type: "list_users".to_string(),
+                                    message: "".to_string(),
+                                    name: None,
+                                    room_uuid: None,
+                                    user_uuid: None,
+                                    json: Some(message_json)
+                                };
+                                
+                                server_msg
+                                
+                            },
+                            Err(e) => {
+                                println!("Erreur récupération room/messages: {:?}", e);
+                                let error_msg = ServerMessage {
+                                    msg: "Failed to retrieve room data".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: format!("Database error: {}", e),
+                                    name: None,
+                                    room_uuid: None,
+                                    user_uuid: None,
+                                    json: None
+                                };
+                                error_msg
+                            }
+                        }
+                    };
+                    ctx.spawn(
+                    fut::wrap_future(fut)
+                    .map(move |server_msg, _, ctx: &mut WebsocketContext<MyWebSocket> | {
+                            // Send the response to the client
+                            if server_msg.r#type == "error" {
+                                let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                                ctx.text(json);
+                                return;
+                            }
+                            // Also confirm to the sender
+                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                            ctx.text(json);
+                        })
+                    );
+                }
+
                 Err(err) => {
                     eprintln!("Erreur de parsing WebSocket JSON: {}", err);
                     ctx.text("Erreur : message JSON invalide.");
                 }
+                _ => {} // sert de default
             }
         }
     }

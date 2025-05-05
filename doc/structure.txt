@@ -1,0 +1,68 @@
+├── src
+│   ├── main.rs          ← point d’entrée, routes & render(), websocket -> ws.rs
+│   ├── ws.rs            ← WebSocket ?
+│   └── handlers.rs      ← Toutes les fonctions handlers
+├── templates            ← HTML avec {{ username }} etc.
+│   ├── access.html
+│   ├── home.html
+│   ├── login.html
+│   └── register.html
+
+Structure
+.
+├── app.db
+├── Cargo.lock
+├── Cargo.toml
+├── db
+│   ├── init.sql
+│   └── modif01.sql
+├── doc
+│   ├── charte_de_couleur.txt
+│   ├── comunik_MLD.sql
+│   ├── comunik_MLD.txt
+│   ├── init.txt
+│   ├── Looping1.lo1
+│   ├── Looping1.loo
+│   ├── MCD_graph.jpg
+│   ├── MLD_graph.jpg
+│   ├── MPD_graph.jpg
+│   ├── structure.txt
+│   ├── svg.txt
+│   └── table.isl
+├── README.md
+├── src
+│   ├── handlers.rs
+│   ├── main.rs
+│   ├── models.rs
+│   ├── sql_req.rs
+│   ├── tools.rs
+│   ├── ws_init.rs
+│   └── ws.rs
+├── static
+│   ├── css
+│   │   ├── access.css
+│   │   ├── header.css
+│   │   ├── home.css
+│   │   ├── login.css
+│   │   ├── messages.css
+│   │   ├── profile.css
+│   │   ├── register.css
+│   │   └── style_for_all.css
+│   ├── index.html
+│   └── ressources
+│       ├── logo0.jpg
+│       ├── logo1.jpg
+│       ├── logoCode.jpg
+│       ├── logoO.jpg
+│       ├── logoU.png
+│       ├── PROJECT Comunik.lun
+│       ├── tables_comunik.pdf
+│       └── Untitled.png
+└── templates
+    ├── access.html
+    ├── home.html
+    ├── login.html
+    ├── profile.html
+    └── register.html
+
+8 directories, 47 files

@@ -11,6 +11,31 @@ body{
     color: white;
 }
 
+.bg-line {
+    /* display: flex; */
+    /* align-items: center; */
+    /* justify-content: center; */
+    height: 100vh;
+    width: 100vw;
+    /* background-color: #d8b4fe; Fond violet clair */
+    background-color: #32746D;
+    /* background-image: url("data:image/svg+xml;utf8,<svg width='10' height='10' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><polygon points='50,0 60,40 100,50 60,60 50,100 40,60 0,50 40,40' fill='%237c3aed'/></svg>"); */
+    background-image: url("data:image/svg+xml;utf8,<svg width='10' height='10' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><polygon points='50,0 60,40 100,50 60,60 50,100 40,60 0,50 40,40' fill='%239EC5AB'/></svg>");
+    /*background-image: radial-gradient(circle, #9EC5AB 2px, transparent 1px); Points violet foncé */
+    background-size: 20px 20px;
+    animation: moveBackground 25s linear infinite; /* Animation plus lente pour être fluide */
+  }
+
+@keyframes moveBackground {
+    0% {
+    background-position: 0 0;
+    }
+    100% {
+    background-position: 1000px 500px;
+    /* background-position: 20px 20px; */
+    }
+}
+
 /* Par defaut pour tous les boutons du site */
 button{
     background:transparent;

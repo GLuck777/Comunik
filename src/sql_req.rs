@@ -152,6 +152,14 @@ pub struct RoomSpe {
     // pub created_at: String,
     // Add other fields as needed
 }
+#[derive(Debug, FromRow, Serialize)]
+pub struct ListUser {
+    pub uuid: String,
+    pub pseudo: String,
+    // pub visibility: String,
+    // pub created_at: String,
+    // Add other fields as needed
+}
 
 fn my_custom_date_serializer<S>(
     date: &NaiveDateTime,
@@ -295,4 +303,36 @@ pub async fn get_all_rooms(pool: &SqlitePool) -> Result<Vec<RoomSpe>, sqlx::Erro
         .await?;
     Ok(rooms)
 }
+pub async fn get_list_users(pool: &SqlitePool, pseudo: String) -> Result<Vec<ListUser>, sqlx::Error> {
+    let list_users = sqlx::query_as::<_, ListUser>("SELECT uuid, pseudo FROM users Where pseudo != ?")
+        .bind(pseudo)
+        .fetch_all(pool)
+        .await?;
+    Ok(list_users)
+}
 
+
+/// Récupère tous les UUIDs des utilisateurs associés à une room donnée
+pub async fn get_room_user_uuids(
+    pool: &SqlitePool,
+    room_uuid: &str,
+) -> Result<Vec<String>, sqlx::Error> {
+    let rows = sqlx::query("SELECT user_uuid FROM room_members WHERE room_uuid = ?")
+        .bind(room_uuid)
+        .fetch_all(pool)
+        .await?;
+
+    // for row in rows {
+    //     let uuid: String = row.get("user_uuid");
+    //     let role: String = row.get("role");
+    //     println!("User: {}, Role: {}", uuid, role);
+    // }
+    let user_uuids = rows
+        .into_iter()
+        .map(|row| row.get::<String, _>("user_uuid"))
+        .collect();
+
+    println!("\n#### voici les membre qui vont recevoir la room: {:?}", user_uuids);
+
+    Ok(user_uuids)
+}

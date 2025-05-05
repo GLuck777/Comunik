@@ -1,0 +1,74 @@
+Table users {
+  uuid varchar(255) [pk]
+  email varchar(255) [not null, unique]
+  password varchar(255) [not null]
+  pseudo varchar(255) [not null, unique]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table friend_requests {
+  sender_uuid varchar(255) [not null]
+  receiver_uuid varchar(255) [not null]
+  status varchar(255) [default: 'pending']
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (sender_uuid, receiver_uuid) [pk]
+  }
+}
+
+Table friendships {
+  user1_uuid varchar(255) [not null]
+  user2_uuid varchar(255) [not null]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (user1_uuid, user2_uuid) [pk]
+  }
+}
+
+Table notifications {
+  id int [pk]
+  user_uuid varchar(255) [not null]
+  message text [not null]
+  type varchar(255) [default: 'pending']
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table rooms {
+  room_uuid varchar(255) [pk]
+  name varchar(255) [not null]
+  owner_uuid varchar(255) [not null]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table messages {
+  id int [pk]
+  room_uuid varchar(255) [not null]
+  user_uuid varchar(255) [not null]
+  content text [not null]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+}
+
+Table room_members {
+  room_uuid varchar(255) [not null]
+  user_uuid varchar(255) [not null]
+  role varchar(255) [default: 'member']
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (room_uuid, user_uuid) [pk]
+  }
+}
+
+Ref: friend_requests.sender_uuid > users.uuid
+Ref: friend_requests.receiver_uuid > users.uuid
+Ref: friendships.user1_uuid > friend_requests.sender_uuid
+Ref: friendships.user2_uuid > friend_requests.receiver_uuid
+Ref: notifications.user_uuid > users.uuid
+Ref: rooms.owner_uuid > users.uuid
+Ref: messages.room_uuid > rooms.room_uuid
+Ref: messages.user_uuid > users.uuid
+Ref: room_members.room_uuid > rooms.room_uuid
+Ref: room_members.user_uuid > users.uuid
+

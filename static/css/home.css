@@ -56,13 +56,11 @@
   z-index: 2;
   top: -2%;
   display: flex;
-  gap: 10px;
+  gap: 1%;
   margin-bottom: 20px;
   width: fit-content;
   border-bottom: 4px solid gray;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  
+  border-radius: 8px;
 }
 .tabs button {
   padding: 10px 20px;
