@@ -57,9 +57,9 @@
       <button id="open-room-modal">Créer une Room</button>
       <!-- Modal -->
       <div id="room-modal" style="display:none;">
-        <div class="modal-content">
+        <div class="modal_add_room">
           <h3>Créer une Room</h3>
-          <form id="create-room-form">
+          <form id="create_room_form">
             <label>Nom de la Room :</label>
             <input type="text" name="room_name" required>
 
@@ -109,15 +109,83 @@
         <div class="aff_room">
           <h2 class="decal_title">Room: <p id="room_name"></p></h2>
           <div id="messages_post"> <!-- Contenant pour afficher les messages -->
-            <div class="message_content" id="message_content">
-              
+            <!-- <div class="room_closed" id="sas_door"></div> -->
+            <div class="door_wrapper" id="sas_door">
+              <div class="door door_left"></div>
+              <div class="door door_right"></div>
             </div>
+            <div class="settings">
+              <button id="" onclick="settings()"> <!-- Ouvre une fenetre modale qui permet de modifier le parametre de la room, ajout de collegue, changement du nom, suppression de la room-->
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">
+                  <mask id="lineMdCogFilled0">
+                    <defs>
+                      <symbol id="lineMdCogFilled1">
+                        <path d="M11 13L15.74 5.5C16.03 5.67 16.31 5.85 16.57 6.05C16.57 6.05 16.57 6.05 16.57 6.05C16.64 6.1 16.71 6.16 16.77 6.22C18.14 7.34 19.09 8.94 19.4 10.75C19.41 10.84 19.42 10.92 19.43 11C19.43 11 19.43 11 19.43 11C19.48 11.33 19.5 11.66 19.5 12z">
+                          <animate fill="freeze" attributeName="d" begin="0.5s" dur="0.2s" values="M11 13L15.74 5.5C16.03 5.67 16.31 5.85 16.57 6.05C16.57 6.05 16.57 6.05 16.57 6.05C16.64 6.1 16.71 6.16 16.77 6.22C18.14 7.34 19.09 8.94 19.4 10.75C19.41 10.84 19.42 10.92 19.43 11C19.43 11 19.43 11 19.43 11C19.48 11.33 19.5 11.66 19.5 12z;M11 13L15.74 5.5C16.03 5.67 16.31 5.85 16.57 6.05C16.57 6.05 19.09 5.04 19.09 5.04C19.25 4.98 19.52 5.01 19.6 5.17C19.6 5.17 21.67 8.75 21.67 8.75C21.77 8.92 21.73 9.2 21.6 9.32C21.6 9.32 19.43 11 19.43 11C19.48 11.33 19.5 11.66 19.5 12z"/>
+                        </path>
+                      </symbol>
+                    </defs>
+                    <g fill="none" stroke="#fff" stroke-width="2">
+                      <path stroke-dasharray="36" stroke-dashoffset="36" stroke-width="5" d="M12 7c2.76 0 5 2.24 5 5c0 2.76 -2.24 5 -5 5c-2.76 0 -5 -2.24 -5 -5c0 -2.76 2.24 -5 5 -5Z">
+                        <animate fill="freeze" attributeName="stroke-dashoffset" dur="0.5s" values="36;0"/>
+                        <set fill="freeze" attributeName="opacity" begin="0.5s" to="0"/>
+                      </path>
+                      <g fill="#fff" stroke="none" opacity="0">
+                        <use href="#lineMdCogFilled1"/>
+                        <use href="#lineMdCogFilled1" transform="rotate(60 12 12)"/>
+                        <use href="#lineMdCogFilled1" transform="rotate(120 12 12)"/>
+                        <use href="#lineMdCogFilled1" transform="rotate(180 12 12)"/>
+                        <use href="#lineMdCogFilled1" transform="rotate(240 12 12)"/>
+                        <use href="#lineMdCogFilled1" transform="rotate(300 12 12)"/>
+                        <set fill="freeze" attributeName="opacity" begin="0.5s" to="1"/>
+                      </g>
+                    </g>
+                    <circle cx="12" cy="12" r="3.5"/>
+                  </mask><rect width="24" height="24" fill="currentColor" mask="url(#lineMdCogFilled0)"/>
+                </svg>
+              </button>
+            </div>
+            <!-- MODAL POUR MODIFICATION D'UNE ROOM (en travaux) -->
+            <div id="roomModal" class="modal">
+              <div class="modal_content">
+                <span class="close-btn" onclick="closeRoomModal()">&times;</span>
+                <h2>Paramètres de la Room</h2>
+                
+                <div class="modal-section">
+                  <label for="roomName">Nom de la room :</label>
+                  <div class="choice_set">
+                    <input type="text" name="change_Rname" id="change_Rname" value="">
+                    <button onclick="editRoomName()" style="background-color: rgb(58, 92, 24); color: #dedede;">Changer</button>
+                  </div>
+                </div>
+            
+                <div class="modal-section">
+                  <label>Collègues :</label>
+                  <ul id="roomColleagues">
+                    
+                  </ul>
+                  <label for="addColleagues">Ajouter un/des collegue(s)</label>
+                  <div class="choice_set">
+                    <input type="text" id="new_inv" name="new_inv" placeholder="Rechercher un pseudo..." list="user_list">
+                    <datalist id="user_list"></datalist>
+                    <div id="tag_container"></div>
+                    <button onclick="addMembers()" style="background-color: rgb(58, 92, 24); color: #dedede;">Ajouter</button>
+                  </div>
+                </div>
+            
+                <div class="modal-section danger-zone">
+                  <button onclick="deleteRoom()">🗑 Supprimer la room</button>
+                </div>
+              </div>
+            </div>
+            <div class="message_content" id="message_content"></div>
             <div class="message_Sender">
               <input type="text" id="message_input" placeholder="Tapez votre message...">
               <button class="sender_btn" onclick="sendMessage()">Envoyer</button>
             </div>
           </div>
         </div>
+        <!-- a finir en ajoutant le nom de tous les membres disponibles-->
         <aside class="list_room">
           <h2>Rooms disponibles :</h2>
           {% if rooms and rooms | length > 0 %}
@@ -147,30 +215,12 @@
   let socket = null;
   let currentRoomUuid = null;
   let current_user_uuid = document.getElementById("uuid").value;
+  let liste_utilisateurs = []; // {pseudo: "Nom", uuid: "uuid"}
+  let selected_users = new Map(); // pseudo -> uuid
 
-  // function connectToWebSocket(path = "/ws/") {
-  //   const fullUrl = `ws://localhost:8080${path}`;
-  //   // console.log("Connecting to WebSocket at:", fullUrl);
-    
-  //   socket = new WebSocket(fullUrl);
-
-  //   socket.onopen = () => {
-  //     // console.log("Socket connecté à", fullUrl)
-  //     const roomUuid = path.replace("/ws/", "");
-  //   };
-  //   socket.onerror = (e) => console.error("Erreur WebSocket :", e);
-  //   socket.onclose = (event) => {
-  //     console.log("Socket fermé:", event);
-  //     if (event.code) console.log("Code:", event.code);
-  //     if (event.reason) console.log("Raison:", event.reason);
-  //   };
-  //   socket.onmessage = (event) => {
-  //     // console.log("🎯 Message WebSocket reçu:", event.data);
-  //     handleIncomingMessage(event.data);
-  //   };
-  // }
+  
   // To manage each connection to the WebSocket
-  function connectToWebSocket(path = "/ws/") {
+  async function connectToWebSocket(path = "/ws/") {
     const fullUrl = `ws://${window.location.host}${path}`;
     console.log("Connecting to WebSocket at:", fullUrl);
     
@@ -210,7 +260,7 @@
     };
     
     socket.onmessage = (event) => {
-      console.log("🎯 WebSocket message received:", event.data);
+      // console.log("🎯 WebSocket message received:", event.data);
       handleIncomingMessage(event.data);
     };
     
@@ -222,6 +272,15 @@
       console.error("Room UUID is undefined or empty");
       return;
     }
+    // const door = document.getElementById("sas_door");
+    // if (door){
+    //   door.classList.add("opening");
+      
+    //   // Optionnel : supprimer la div après l'animation
+    //   door.addEventListener("animationend", () => {
+    //     door.style.display = "none";
+    //   });
+    // }
     
     console.log("Opening room:", roomUuid);
     await connectToWebSocket(`/ws/${roomUuid}`);
@@ -237,6 +296,52 @@
         return false;
       }
     }
+    // coté animation door
+    const doorWrapper = document.getElementById("sas_door");
+
+    if (!doorWrapper) return;
+    if (doorWrapper.classList.contains("opening")) return;
+
+    doorWrapper.classList.add("opening");
+
+    doorWrapper.addEventListener("animationend", () => {
+      if (doorWrapper && doorWrapper.parentNode) {
+        doorWrapper.parentNode.removeChild(doorWrapper);
+      }
+    }, { once: true });
+    //fin animation et suppression de la div
+  }
+
+  // EN Travaux --> pour ajouter de/des membres à ta room
+  async function addMembers(){
+    console.log("Ajouter des membres pour room:", currentRoomUuid);
+    await connectToWebSocket(`/ws/${currentRoomUuid}`);
+    const input = document.querySelector('[name="new_inv"]');
+    const invitees = input.value
+      .split(',')
+      .map(x => x.trim())
+      .filter(Boolean);
+    console.log("liste invitée: ", invitees);
+    socket.onopen = () => {
+      try {
+        socket.send(JSON.stringify({ 
+        type: "add_members", 
+        room_uuid: currentRoomUuid,
+        invitees: invitees,
+        }));
+      } catch (e) {
+        console.error("Error opening room:", e);
+        return false;
+      }
+    }
+  }
+
+  async function settings(){
+    console.log("setting", currentRoomUuid);
+    document.getElementById("roomModal").style.display = "block";
+  }
+  function closeRoomModal() {
+    document.getElementById("roomModal").style.display = "none";
   }
 
   async function fetch_users() {  
@@ -319,7 +424,7 @@
     let parsed;
     try {
       parsed = JSON.parse(data);
-      console.log("parsed data:", parsed);
+      // console.log("parsed data:", parsed);
     } catch (e) {
       console.error("Erreur JSON handleIncomingMessage", e);
       return;
@@ -341,9 +446,12 @@
         roomsContainer_filler(list_R);
         break;
       case "room_with_messages":
-        console.log("Room info:", parsed);
+        // console.log("Room info:", parsed);
         // message: "", name: "Kende", room_uuid: "74f4820a-c4bc-4e85-930b-dc18c98d6d60"
+        // écrit toutes les informations de la room
         displayRoomMessages(parsed);
+        // rempli les information pour la modal settings
+        displayRoomSettings(parsed);
         currentRoomUuid = parsed.room_uuid;
         break;
       case "list_users":
@@ -401,18 +509,28 @@
   function displayTempListUser(json){
     // pour la prochaine verification en bac avant le fetch si l'user est deja follow, son statut...
     // prochaine maj ajouter accès au profil utilisateur (si utile)
-    let list_user = document.getElementById('list_user')
-    
+    let list_user = document.getElementById('list_user');
+    let datalist = document.getElementById('user_list');
+    datalist.innerHTML = ""; // Clear previous options
+    liste_utilisateurs = [];
+
     json.forEach(element => {
-      let btnDispatch = document.createElement("button")
-      btnDispatch.textContent = " Suivre ?"
-      let divDispatch = document.createElement("div")
-      divDispatch.className = "card_users"
+      liste_utilisateurs.push({ pseudo: element.pseudo, uuid: element.uuid });
+
+      let option = document.createElement("option");
+      option.value = element.pseudo;
+      datalist.appendChild(option);
+
+      let btnDispatch = document.createElement("button");
+      btnDispatch.textContent = " Suivre ?";
+      let divDispatch = document.createElement("div");
+      divDispatch.className = "card_users";
       divDispatch.textContent = element.pseudo;
       divDispatch.id = element.uuid;
       divDispatch.appendChild(btnDispatch);
       list_user.appendChild(divDispatch);
-    }); 
+    });
+    
   }
   //reception de tous les messages entrant pour une room
   function displayRoomMessages(messages) {
@@ -426,15 +544,14 @@
 
     const name_room = document.getElementById("room_name");
     let message_content = document.getElementById("message_content");
+    
 
     name_room.textContent = messages.name;
     message_content.innerHTML = "";
 
     let lastDate = "";
 
-    
-
-    messages.json.forEach(msg => {
+    messages.json.messages.forEach(msg => {
         const [day, month, yearWithTime] = msg.created_at.split("/");
         const [year, time] = yearWithTime.split(" ");
         const currentDate = `${day}/${month}/${year}`;
@@ -482,7 +599,32 @@
         message_content.appendChild(msgDiv);
     });
   }
+  
+  function displayRoomSettings(messages){
+    let list_coll = document.getElementById("roomColleagues");
+    list_coll.innerHTML = "";
+    // new! ajout dans la modale du nom de la room pour son changement possible
+    const change_name = document.getElementById("change_Rname")
+    change_name.value = messages.name;
 
+    messages.json.member_uuids.forEach(member => {
+      // console.log("uuid member: ",member);
+      let collegue = document.createElement("li");
+      collegue.className="liste_collegue";
+      let lienCol = document.createElement("a")
+      lienCol.id = member.uuid;
+      lienCol.textContent = member.pseudo;
+      lienCol.href = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
+      svgCol = document.createElement("div")
+      svgCol.className = "redCalliberSvg"
+      svgCol.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="64" stroke-dashoffset="64" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="64;0"/></path><path stroke-dasharray="8" stroke-dashoffset="8" d="M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="8;0"/></path></g></svg'
+      collegue.appendChild(lienCol);
+      collegue.appendChild(svgCol);
+      
+      list_coll.appendChild(collegue);
+
+    })
+  }
   // reception d'un message entrant provenant d'une personne inscrite dans la room
   function displayIncomingMessage(msg) {
     console.log("==> display_IncomingMessage!", msg)
@@ -595,7 +737,7 @@
       document.getElementById("room-modal").style.display = "none";
     });
 
-    document.getElementById("create-room-form").addEventListener("submit", async (e) => {
+    document.getElementById("create_room_form").addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const name = e.target.room_name.value;
@@ -637,7 +779,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     current_user_uuid = document.getElementById("uuid")?.value;
     // Make initial connection
-    connectToWebSocket();
+    // connectToWebSocket();
     
     // Set up other functionality
     if (typeof setupRoomModal === 'function') setupRoomModal();

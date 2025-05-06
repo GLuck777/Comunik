@@ -21,9 +21,9 @@ pub async fn initialize_rooms(
         if let Ok(room_uuid) = Uuid::parse_str(&room.room_uuid) {
             let (tx, _) = broadcast::channel(100); // 100 message capacity
             rooms_map.insert(room_uuid, tx);
-            println!("Initialized broadcast channel for room: {} ({})", room.name, room.room_uuid);
+            // println!("Initialized broadcast channel for room: {} ({})", room.name, room.room_uuid);
         } else {
-            eprintln!("Invalid room UUID format in database: {}", room.room_uuid);
+            // eprintln!("Invalid room UUID format in database: {}", room.room_uuid);
         }
     }
     

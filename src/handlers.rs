@@ -14,6 +14,32 @@ use password_hash::{SaltString, PasswordHash, rand_core::OsRng};
 // use std::io::{self, Read};
 use crate::render;
 
+// use serde::{Serialize, Deserialize};
+use chrono::{Utc, Duration};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,         // UUID de l'utilisateur
+    email: String,
+    pseudo: String,
+    exp: usize,          // Expiration du token (timestamp)
+}
+
+use jsonwebtoken::{decode, DecodingKey, Validation};
+use actix_web::HttpRequest;
+
+//lecture du token dans les handlers
+fn extract_claims_from_token(req: &HttpRequest) -> Option<Claims> {
+    let jwt_secret = "comunik_session_key";
+    let token_cookie = req.cookie("auth_token")?;
+    let token_data = decode::<Claims>(
+        token_cookie.value(),
+        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &Validation::default()
+    ).ok()?;
+    Some(token_data.claims)
+}
+
 #[derive(Deserialize)]
 pub struct AccessForm {
     code: String,
@@ -147,6 +173,24 @@ pub async fn login_post(
                             println!("Email de l'utilisateur: {}", form.email); // form.username
                             // session.insert("pseudo", &pseudo).unwrap_or(());
                             session.insert("uuid", uuid.clone()).unwrap();
+                            // creation du token json
+                            use jsonwebtoken::{encode, Header, EncodingKey};
+
+                            let expiration = Utc::now()
+                                .checked_add_signed(Duration::hours(24))
+                                .unwrap()
+                                .timestamp() as usize;
+
+                            let claims = Claims {
+                                sub: uuid.clone(),
+                                email: form.email.clone(),
+                                pseudo: pseudo.clone(),
+                                exp: expiration,
+                            };
+
+                            let jwt_secret = "comunik_session_key"; // stocke-le dans une variable d'environnement en prod !
+                            let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(jwt_secret.as_ref())).unwrap();
+                            // fin de creation du token json
                             session.insert("email", form.email.clone()).unwrap();
                             session.insert("pseudo", &pseudo).unwrap();
 
@@ -158,11 +202,18 @@ pub async fn login_post(
 
                             println!("Utilisateur connecté : {} ({}) - uuid: {}", pseudo, email, uuid);
 
-                            // return render("home.html", ctx);
+                            // return HttpResponse::Found()
+                            // .append_header(("Location", "/home"))
+                            // .finish();
                             return HttpResponse::Found()
                             .append_header(("Location", "/home"))
+                            .cookie(
+                                actix_web::cookie::Cookie::build("auth_token", token)
+                                    .path("/")
+                                    .http_only(true) // sécurité
+                                    .finish()
+                            )
                             .finish();
-                            
                         }
                     }
                     Err(_) => {}
@@ -250,13 +301,25 @@ pub async fn register_post(
     }
 }
 
+// permet de supprimer le coockie généré
+use actix_web::cookie::{Cookie, time::OffsetDateTime};
 
 pub async fn logout(session: Session) -> impl Responder {
     session.purge(); // ou session.clear();
-    HttpResponse::Found().append_header(("Location", "/login")).finish()
+
+    // Crée un cookie "auth_token" expiré
+    let expired_cookie = Cookie::build("auth_token", "")
+        .expires(OffsetDateTime::UNIX_EPOCH) // Expiré depuis 1970 pour bien montrer qu'il est moisi
+        .finish();
+
+    HttpResponse::Found()
+        .append_header(("Location", "/login"))
+        .cookie(expired_cookie) // Supprime côté client
+        .finish()
+    // HttpResponse::Found().append_header(("Location", "/login")).finish()
 }
 
-pub async fn home(session: Session, pool: web::Data<SqlitePool>) -> impl Responder {
+pub async fn home(req: HttpRequest, session: Session, pool: web::Data<SqlitePool>) -> impl Responder {
     if let Ok(Some(uuid)) = session.get::<String>("uuid") {
         let email = session.get::<String>("email").unwrap_or(None).unwrap_or_default();
         let usernamebis = session.get::<String>("pseudo").unwrap_or(None).unwrap_or_default();
@@ -272,14 +335,23 @@ pub async fn home(session: Session, pool: web::Data<SqlitePool>) -> impl Respond
         println!("\n\tRooms: {:?}", rooms); // Affiche les rooms dans le terminal
 
 
+        if let Some(claims) = extract_claims_from_token(&req) {
+            let mut ctx = Context::new();
+            ctx.insert("uuid", &claims.sub);
+            ctx.insert("email", &claims.email);
+            ctx.insert("username", &claims.pseudo);
+            ctx.insert("rooms", &rooms);
+            render("home.html", ctx)
+        } else {
+            HttpResponse::Found().append_header(("Location", "/login")).finish() // doublon...
+        }
         // Insérer dans le contexte Tera
-        let mut ctx = Context::new();
-        ctx.insert("email", &email);
-        ctx.insert("username", &username);
-        ctx.insert("uuid", &uuid);
-        ctx.insert("rooms", &rooms);
-
-        render("home.html", ctx)
+        // let mut ctx = Context::new();
+        // ctx.insert("email", &email);
+        // ctx.insert("username", &username);
+        // ctx.insert("uuid", &uuid);
+        // ctx.insert("rooms", &rooms);
+        // render("home.html", ctx)
     } else {
         return HttpResponse::Found().append_header(("Location", "/login")).finish();
     }
@@ -341,6 +413,7 @@ pub async fn get_room_by_uuid(
     }
 }
 
+// SQL basique qui sert de modele classique voir sql_res.rs pour voir la fonction d'insertion de message
 async fn save_message(pool: &SqlitePool, room_uuid: &str, user_uuid: &str, content: &str) {
     let result = sqlx::query(
         "INSERT INTO messages (room_uuid, user_uuid, content) VALUES (?, ?, ?)")

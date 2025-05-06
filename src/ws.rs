@@ -96,7 +96,7 @@ impl Handler<MyMessage> for MyWebSocket {
 #[serde(tag = "type")]
 pub enum ClientMessage {
     #[serde(rename = "create_room")]
-    CreateRoom { name: String, visibility: String, invitees: Vec<String>, },
+    CreateRoom { name: String, visibility: String, invitees: Vec<String>},
 
     #[serde(rename = "chat")]
     Chat { room_uuid: String, message: String },
@@ -106,6 +106,9 @@ pub enum ClientMessage {
 
     #[serde(rename = "fetch_users")]
     GetUsersData {},
+
+    #[serde(rename = "add_members")]
+    AddRoomMembers {room_uuid: String, invitees: Vec<String>},
 
 
 
@@ -294,8 +297,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                 
                                 // Get room and message data
                                 match get_room_with_messages(&pool, &room_uuid_clone).await {
-                                    Ok((room, messages)) => {
-                                        let message_json = serde_json::to_value(&messages).unwrap_or(json!([]));
+                                    
+                                    Ok((room, messages, member_uuids)) => {
+                                        // let message_json = serde_json::to_value(&messages).unwrap_or(json!([]));
+                                        let message_json = json!({
+                                            "messages": messages,
+                                            "member_uuids": member_uuids
+                                        });
                                         let server_msg = ServerMessage {
                                             msg: "Room et messages récupérés.".to_string(),
                                             r#type: "room_with_messages".to_string(),
@@ -559,7 +567,87 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                         })
                     );
                 }
+                Ok(ClientMessage::AddRoomMembers{ room_uuid, invitees }) => {
+                    println!("\x1b[0;31m AddRoomMembers! \x1b[0m");
+                    let pool = self.db_pool.clone();
+                    let user_uuid = self.user_uuid.clone();
+                    let room_uuid_clone = room_uuid.clone();
+                    let invitees_clone = invitees.clone();
+                    let rooms = Arc::clone(&self.rooms);
+                    let addr = ctx.address();
+                    let rooms_clone = Arc::clone(&rooms);
+                    let fut = async move {
+                        let result = add_members_in_room(&pool, &room_uuid_clone, invitees_clone).await;
+                    
+                        let (server_msg, receivers_opt) = match result {
+                            Ok(added_users) => {
+                                println!("\x1b[0;33m[Membres ajoutés dans la room]:\x1b[0m");
+                                for (uuid, pseudo) in &added_users {
+                                    println!("\x1b[0;33m - {} ({})\x1b[0m", pseudo, uuid);
+                                }
+                    
+                                let all_uuids = added_users.iter().map(|(uuid, _)| *uuid).collect::<Vec<Uuid>>();
+                                let server_msg = ServerMessage {
+                                    msg: "Membres ajoutés avec succès à la room.".to_string(),
+                                    r#type: "add_members_clear".to_string(),
+                                    message: format!("Des membres ont été ajoutés à la room {}", room_uuid_clone),
+                                    name: None,
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(user_uuid.clone()),
+                                    json: None,
+                                };
+                                (server_msg, Some(all_uuids))
+                            }
+                            Err(e) => {
+                                let error_msg = ServerMessage {
+                                    msg: "Erreur lors de l'ajout des membres".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: format!("Erreur BDD: {}", e),
+                                    name: None,
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(user_uuid.clone()),
+                                    json: None,
+                                };
+                                (error_msg, None)
+                            }
+                        };
+                        // Récupérer le sender pour la room
+                        let mut sender_opt = None;
+                        if let Ok(room_uuid_parsed) = Uuid::parse_str(&room_uuid_clone) {
+                            let rooms_guard = rooms.lock().unwrap();
+                            sender_opt = rooms_guard.get(&room_uuid_parsed).cloned();
+                        }
+                        (server_msg, sender_opt)
+                    };
 
+                    
+
+                    ctx.spawn(
+                        fut::wrap_future(fut).map(move |(server_msg, receivers_opt), _, ctx: &mut WebsocketContext<MyWebSocket>| {
+                            if let Some(receivers) = receivers_opt {
+                                if let Ok(room_uuid_parsed) = Uuid::parse_str(&room_uuid) {
+                                    let rooms_guard = rooms_clone.lock().unwrap();
+                                    if let Some(sender) = rooms_guard.get(&room_uuid_parsed) {
+                                        let _ = sender.send(server_msg.clone());
+                                    }
+                                }
+                            }
+                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                            ctx.text(json);
+                        }),
+                    );
+                    
+                
+                    // ctx.spawn(
+                    //     fut::wrap_future(fut).map(move |(server_msg, sender_opt), _, ctx| {
+                    //         if let Some(sender) = sender_opt {
+                    //             let _ = sender.send(server_msg.clone()); // Envoie broadcast
+                    //         }
+                    //         let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                    //         ctx.text(json); // Feedback à celui qui a fait la requête
+                    //     }),
+                    // );
+                }
                 Err(err) => {
                     eprintln!("Erreur de parsing WebSocket JSON: {}", err);
                     ctx.text("Erreur : message JSON invalide.");

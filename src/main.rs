@@ -6,6 +6,7 @@ use env_logger;
 mod ws_init;
 
 
+
 // use actix_files::Files;
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, middleware};
 use actix_web_actors::ws as other_ws;
@@ -44,21 +45,18 @@ pub async fn websocket_handler(
     path: Option<web::Path<String>> // <- ici
 ) -> Result<HttpResponse, actix_web::Error> { //ajout: pool: web::Data<SqlitePool>
     // other_ws::start(ws::MyWebSocket { db_pool: pool.get_ref().clone() }, &req, stream)
-    println!(r"\x1b[0;31m debut de test \x1b[0m");
     let room_uuid = path.map(|p| p.into_inner());
-    println!(r"\x1b[0;31m deuxieme partie de test \x1b[0m");
     if let Some(uuid) = session.get::<String>("uuid")? {
-        println!(r"\x1b[0;31m troisieme partie de test \x1b[0m");
         let ws = ws::MyWebSocket {
             db_pool: app_state.db_pool.clone(),
             user_uuid: uuid,
             room_uuid,
             rooms: Arc::clone(&app_state.rooms),
         };
-        println!(r"\x1b[0;31m quatrieme partie de test \x1b[0m");
+        println!("\x1b[0;31m Start! \x1b[0m");
         other_ws::start(ws, &req, stream)
     } else {
-        println!(r"\x1b[0;31m cinquieme partie de test \x1b[0m");
+        println!("\x1b[0;31m cinquieme partie de test \x1b[0m");
         Err(actix_web::error::ErrorUnauthorized("No UUID in session"))
     }
     // other_ws::start(ws::MyWebSocket {}, &req, stream) // ancienne version sans pool
@@ -119,7 +117,7 @@ async fn main() -> std::io::Result<()> {
                 secret_key.clone(),
             )
             .cookie_secure(false) // pour local, true en prod
-            .cookie_name("my_session".to_string()) // optionnel
+            .cookie_name("comunik_session".to_string()) // optionnel
             .build())
             .service(Files::new("/static", "./static").show_files_listing()) // enlever show_files_listening une fois le developpement effectué
             .service(web::resource("/access").route(web::get().to(handlers::access_form)).route(web::post().to(handlers::access_check)))
