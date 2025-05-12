@@ -231,6 +231,7 @@ pub async fn login_post(
                                 // Nous ne pouvons pas encore enregistrer de connection (websocket), 
                                 // mais nous pouvons stocker les données
                                 manager.user_data.insert(uuid.clone(), user_data).unwrap();
+
                                 println!("=== Utilisateurs connectés ===");
                                 for (uuid, data) in manager.user_data.iter() {
                                     println!("- UUID: {}", uuid);
@@ -347,7 +348,17 @@ pub async fn register_post(
 // permet de supprimer le coockie généré
 use actix_web::cookie::{Cookie, time::OffsetDateTime};
 
-pub async fn logout(session: Session) -> impl Responder {
+pub async fn logout(
+    session: Session,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
+    if let Some(uuid) = session.get::<String>("uuid").ok().flatten() {
+        let mut manager = app_state.connection_manager.lock().await;
+
+        // Supprimer les données de l'utilisateur
+        manager.user_data.remove(&uuid);
+        manager.user_connections.remove(&uuid); // Facultatif : s'il n'y a plus de WebSocket actif
+    }
     session.purge(); // ou session.clear();
 
     // Crée un cookie "auth_token" expiré
@@ -582,6 +593,46 @@ pub async fn profile(session: Session, pool: web::Data<SqlitePool>) -> impl Resp
     HttpResponse::Found()
         .append_header(("Location", "/login"))
         .finish()
+}
+pub async fn profile_uuid(
+    path: web::Path<String>,
+    session: Session,
+    pool: web::Data<SqlitePool>,
+) -> impl Responder {
+    let requested_uuid = path.into_inner();
+    println!("Accès au profil de : {}", requested_uuid);
+
+    // Récupération des infos depuis la base
+    let row = sqlx::query("SELECT email, pseudo FROM users WHERE uuid = ?")
+        .bind(&requested_uuid)
+        .fetch_optional(pool.get_ref())
+        .await;
+    // let is_owner = false;
+    
+
+    match row {
+        Ok(Some(row)) => {
+            
+            let email: String = row.get("email");
+            let pseudo: String = row.get("pseudo");
+
+            let mut ctx = Context::new();
+            ctx.insert("email", &email);
+            ctx.insert("pseudo", &pseudo);
+            ctx.insert("profile_uuid", &requested_uuid);
+
+            // Vérifie si c’est l’utilisateur connecté
+            if let Ok(Some(session_uuid)) = session.get::<String>("uuid") {
+                ctx.insert("is_owner", &(session_uuid == requested_uuid));
+            } else {
+                ctx.insert("is_owner", &false);
+            }
+
+            crate::render("profile.html", ctx)
+        }
+        Ok(None) => HttpResponse::NotFound().body("Utilisateur introuvable"),
+        Err(_) => HttpResponse::InternalServerError().body("Erreur lors de la récupération du profil"),
+    }
 }
 
 #[derive(serde::Deserialize)]

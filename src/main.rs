@@ -141,6 +141,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/logout").route(web::post().to(handlers::logout)))
             .service(web::resource("/home").route(web::get().to(handlers::home)))
             .service(web::resource("/profile").route(web::get().to(handlers::profile)))
+            .service(web::resource("/profile/{user_uuid}").route(web::get().to(handlers::profile_uuid)))
             .service(web::resource("/profile/edit").route(web::post().to(handlers::update_profile)))
             .service(web::resource("/api/rooms/{user_uuid}").route(web::get().to(get_room_by_uuid)))
             .service(web::resource("/api/notif/{user_uuid}").route(web::get().to(get_user_notifications)))

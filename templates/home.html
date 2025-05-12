@@ -474,7 +474,7 @@
           displayIncomingMessage(msg);
         break;
       case "add_members_clear":
-        displayAllNotifs()
+        displayAllNotifs();
         console.log("ajout du/des membres avec succes!")
         //ajout du membre dans la liste ajout articifiel pas un fetch
         let list_coll = document.getElementById("roomColleagues");
@@ -484,7 +484,8 @@
         let lienCol = document.createElement("a")
         lienCol.id = "uuid du membre"; // ##################################
         lienCol.textContent = "nouveau membre"; // ##################################
-        lienCol.href = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
+        lienCol.target = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
+        lienCol.href = "/profil/"+"uuid_membre"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
         // div suppr membre
         svgCol = document.createElement("div")
         svgCol.className = "redCalliberSvg"
@@ -567,8 +568,13 @@
       btnDispatch.textContent = " Suivre ?";
       let divDispatch = document.createElement("div");
       divDispatch.className = "card_users";
-      divDispatch.textContent = element.pseudo;
       divDispatch.id = element.uuid;
+      // divDispatch.textContent = element.pseudo;
+      let aDispatch = document.createElement("a")
+      aDispatch.textContent = element.pseudo;
+      aDispatch.href = "/profile/"+element.uuid;
+      aDispatch.target = "_blanc"
+      divDispatch.appendChild(aDispatch);
       divDispatch.appendChild(btnDispatch);
       list_user.appendChild(divDispatch);
     });
@@ -819,7 +825,17 @@
 
   // === Init au chargement ===
   document.addEventListener("DOMContentLoaded", () => {
-    current_user_uuid = document.getElementById("uuid")?.value;
+    
+    let current_user_uuid = document.getElementById("uuid")?.value;
+    // const uuidInput = document.getElementById("uuid");
+    // if (uuidInput) {
+    //     const current_user_uuid = uuidInput.value;
+    //     console.log("value", current_user_uuid);
+
+    //     // Supprimer l'input du DOM
+    //     uuidInput.remove();
+    // }
+
     // Make initial connection
     // connectToWebSocket();
     
@@ -846,11 +862,14 @@
       }
   });
     
-    function redirection(button) {
+    function redirection(button, uuidDefault= current_user_uuid) {
       const id = button.id;
       switch (id) {
         case "profil_show":
-          window.location.href = "/profile";
+          window.location.href = "/profile/"+current_user_uuid;
+          break;
+        case "profil_peek":
+          window.location.href = "/profile/"+current_user_uuid;
           break;
         // Add other cases here
         default:

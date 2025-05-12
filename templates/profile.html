@@ -13,7 +13,7 @@
     <header>
         <a href="/home" class="logo"><img src="/static/ressources/logoU.png" alt="logoU"></a>
         <div class="header-actions">
-          <button class="redir" id="profil_show">
+          <button class="redir" id="">
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24">
               <path fill="currentColor" d="M12 12.25c1.24 0 2.25-1.01 2.25-2.25S13.24 7.75 12 7.75S9.75 8.76 9.75 10s1.01 2.25 2.25 2.25m4.5 4c0-1.5-3-2.25-4.5-2.25s-4.5.75-4.5 2.25V17h9zM19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m0 16H5V5h14z"/>
             </svg>
@@ -28,7 +28,7 @@
           </form>
         </div>
       </header>
-    <div class="access_square">
+    <!-- <div class="access_square">
         <h1>Modifier vos informations</h1>
         {% if pseudo %}
         <form class="edit_form" id="edit_form">
@@ -43,8 +43,31 @@
     
         <p id="message_erreur"></p>
         {% endif %}
-        <a href="/profile">Retour au profil</a>
+        <a href="/home">Retour à la page principale</a>
+    </div> -->
+    <div class="profile-container">
+    <h1>Profil de {{ pseudo }}</h1>
+
+    <div class="profile-details">
+        <form id="profile_form" class="edit_form" method="POST" action="/update_profile">
+            
+            <label>Email :</label>
+            <input type="email" name="email" value="{{ email }}" readonly>
+
+            <label>Pseudo :</label>
+            <input type="text" name="pseudo" value="{{ pseudo }}" readonly>
+
+            {% if is_owner %}
+            <div class="btn-group">
+                <button type="button" id="edit_btn" class="edit-btn">Modifier</button>
+                <button type="submit" id="save_btn" class="save-btn" style="display: none;">Enregistrer</button>
+            </div>
+            {% endif %}
+        </form>
     </div>
+
+    
+</div>
 
 
     <script>
@@ -55,9 +78,10 @@
 
         const emailInput = document.querySelector('input[name="email"]');
         const pseudoInput = document.querySelector('input[name="pseudo"]');
-        const submitBtn = document.getElementById('edit_form_btn');
+        const submitBtn = document.getElementById('edit_btn');
+        const saveBtn = document.getElementById("save_btn"); // pour confirmer
 
-        document.getElementById("edit_form").addEventListener("submit", async function (e) {
+        document.querySelector("form.edit_form").addEventListener("submit", async function (e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = {
@@ -95,12 +119,12 @@
           const current_pseudo = pseudoInput.value;
 
           if (current_email !== check_email || current_pseudo !== check_pseudo) {
-              submitBtn.disabled = false;
-              submitBtn.className = "start_btn"
+              saveBtn.disabled = false;
+              saveBtn.className = "start_btn"
               console.log("bouton débloqué")
           } else {
-              submitBtn.disabled = true;
-              submitBtn.className = "block_btn"
+              saveBtn.disabled = true;
+              saveBtn.className = "block_btn"
               console.log("bouton bloqué")
           }
         };
@@ -108,6 +132,25 @@
         // Écouteurs sur les deux champs
         emailInput.addEventListener('input', checkForChanges);
         pseudoInput.addEventListener('input', checkForChanges);
+
+        // endroit à tester changeur 
+        const editBtn = document.getElementById("edit_btn");
+        // const saveBtn = document.getElementById("save_btn");
+        const inputs = document.querySelectorAll("#profile_form input");
+
+        editBtn?.addEventListener("click", () => {
+            
+            if (submitBtn.textContent != "Retour"){
+              inputs.forEach(input => input.removeAttribute("readonly"));
+              submitBtn.textContent = "Retour";
+              saveBtn.style.display = "inline-block";
+            } else {
+              inputs.forEach(input => input.setAttribute("readonly", true));
+              submitBtn.textContent = "Modifier";
+              saveBtn.style.display = "none";
+            }
+        });
+
 
       });
     </script>
