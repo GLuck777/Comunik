@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>usersOn</title>
+</head>
+<body>
+
+{% block content %}
+<h2>Utilisateurs connectés</h2>
+<table>
+  <thead>
+    <tr>
+      <th>UUID</th>
+      <th>Email</th>
+      <th>Pseudo</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for user in users %}
+    <tr>
+      <td>{{ user.uuid }}</td>
+      <td>{{ user.email }}</td>
+      <td>{{ user.pseudo }}</td>
+      <td>
+        {% if user.connected %}
+        <span style="color: green;">Connecté</span>
+        {% else %}
+        <span style="color: red;">Déconnecté</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+  
+</body>
+</html>

@@ -2,9 +2,10 @@
 
 use actix::Addr;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use uuid::Uuid;
+use tokio::sync::Mutex;
 
 use crate::ws::{MyWebSocket, ServerMessage, DirectMessage};
 
@@ -13,7 +14,7 @@ use crate::ws::{MyWebSocket, ServerMessage, DirectMessage};
 // Structure ConnectionManager améliorée
 pub struct ConnectionManager {
     // Mapping UUID d'utilisateur -> Addr de WebSocket
-    pub user_connections: HashMap<String, Addr<MyWebSocket>>,
+    pub user_connections: HashMap<String, Addr<MyWebSocket>>, //alias sa connection à la websocket
     // Mapping UUID de room -> canal broadcast
     pub room_channels: HashMap<Uuid, broadcast::Sender<ServerMessage>>,
     // Données additionnelles sur les utilisateurs (optionnel)
@@ -221,6 +222,10 @@ impl ConnectionManager {
 // }
 
 // Créer une instance globale accessible de partout
+// lazy_static::lazy_static! {
+//     pub static ref GLOBAL_CONNECTION_MANAGER: Arc<Mutex<ConnectionManager>> = Arc::new(Mutex::new(ConnectionManager::new()));
+// }
+// Créez une instance globale de ConnectionManager
 lazy_static::lazy_static! {
-    pub static ref GLOBAL_CONNECTION_MANAGER: Arc<Mutex<ConnectionManager>> = Arc::new(Mutex::new(ConnectionManager::new()));
+    pub static ref CONNECTION_MANAGER: Arc<Mutex<ConnectionManager>> = Arc::new(Mutex::new(ConnectionManager::new()));
 }

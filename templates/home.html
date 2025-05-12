@@ -181,7 +181,7 @@
             <div class="message_content" id="message_content"></div>
             <div class="message_Sender">
               <input type="text" id="message_input" placeholder="Tapez votre message...">
-              <button class="sender_btn" onclick="sendMessage()">Envoyer</button>
+              <button id="sender_btn" class="sender_btn" onclick="sendMessage()">Envoyer</button>
             </div>
           </div>
         </div>
@@ -835,6 +835,16 @@
         redirection(button);
       });
     });
+    document.getElementById("message_input").addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+          const message = this.value.trim();
+          const roomName = document.getElementById("room_name").textContent.trim();
+
+          if (message !== "" && roomName !== "") {
+              sendMessage();
+          }
+      }
+  });
     
     function redirection(button) {
       const id = button.id;

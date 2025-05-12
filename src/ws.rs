@@ -1,4 +1,5 @@
-use crate::connection_manager::ConnectionManager;
+
+use crate::connection_manager::CONNECTION_MANAGER;
 use actix_session::Session;
 use actix::{Actor, StreamHandler, Addr};  // Ajout d'Addr pour gérer les références d'acteurs
 use actix::AsyncContext;
@@ -14,11 +15,11 @@ use tokio::spawn;
 use serde_json::Value;
 
 use serde_json::json;
-use tokio::sync::broadcast;
+// use tokio::sync::broadcast;
 use std::collections::HashMap;
 use uuid::Uuid;
 use std::sync::Arc;
-use std::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 
 use actix::Message;
 use actix::Handler;
@@ -140,10 +141,7 @@ pub struct ServerMessage {
 //     }
 // }
 
-// Créez une instance globale de ConnectionManager
-lazy_static::lazy_static! {
-    static ref CONNECTION_MANAGER: Arc<Mutex<ConnectionManager>> = Arc::new(Mutex::new(ConnectionManager::new()));
-}
+
 
 #[derive(Debug)]
 pub struct MyWebSocket {
@@ -157,25 +155,22 @@ impl Actor for MyWebSocket {
     type Context = WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // Enregistrer cette connexion dans le gestionnaire global
         let addr = ctx.address();
         let user_uuid = self.user_uuid.clone();
-        
-        {
-            let mut manager = CONNECTION_MANAGER.lock().unwrap();
-            // manager.register_connection(user_uuid, addr);
-            // Récupérer les données utilisateur si elles existent déjà (depuis login)
+
+        actix::spawn(async move {
+            let mut manager = CONNECTION_MANAGER.lock().await;
             let user_data = manager.user_data.remove(&user_uuid);
             manager.register_connection(user_uuid, addr, user_data);
-        }
+        });
     }
 
     fn stopped(&mut self, _: &mut Self::Context) {
-        // Retirer cette connexion du gestionnaire
-        {
-            let mut manager = CONNECTION_MANAGER.lock().unwrap();
-            manager.unregister_connection(&self.user_uuid);
-        }
+        let user_uuid = self.user_uuid.clone();
+        actix::spawn(async move {
+            let mut manager = CONNECTION_MANAGER.lock().await;
+            manager.unregister_connection(&user_uuid);
+        });
     }
 }
 
@@ -208,11 +203,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                         let (tx, _rx) = broadcast::channel(100);
                                         
                                         {
-                                            let mut rooms_guard = rooms.lock().unwrap();
+                                            let mut rooms_guard = rooms.lock().await;
                                             rooms_guard.insert(room_uuid_parsed, tx.clone());
                                             
                                             // Aussi mettre à jour le gestionnaire global de connexions
-                                            let mut manager = CONNECTION_MANAGER.lock().unwrap();
+                                            let mut manager = CONNECTION_MANAGER.lock().await;
                                             manager.room_channels.insert(room_uuid_parsed, tx.clone());
                                         }
                     
@@ -231,7 +226,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                         };
                     
                                         // Notification aux invités via message direct
-                                        let manager = CONNECTION_MANAGER.lock().unwrap();
+                                        let manager = CONNECTION_MANAGER.lock().await;
                                         let user_uuids = get_room_user_uuids(&pool, &room_uuid).await.unwrap_or_default();
                                         
                                         for invitee_uuid in &invitees_clone {
@@ -283,6 +278,312 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     );
                 }
                 
+                Ok(ClientMessage::GetRoomData { room_uuid }) => {
+                    println!("\n\nRécupération de la room et des messages: {:?}\n\n", room_uuid);
+                    
+                    // Clone necessary data
+                    // let pool: Arc<Mutex<SqlitePool>> = Arc::clone(&self.db_pool);
+                    let pool = self.db_pool.clone();
+                    let ctx_addr = ctx.address();
+                    let room_uuid_clone = room_uuid.clone();
+                    let rooms = Arc::clone(&self.rooms);
+                    
+                    // Set the room UUID in the websocket actor state
+                    self.room_uuid = Some(room_uuid.clone());
+                    
+                    // Create a future to handle room data retrieval
+                    let fut = async move {
+                        // Get a clean database connection from the pool
+                        // let db_pool = {
+                        //     let guard = pool.lock().unwrap();
+                        //     guard.clone() // Clone the pool, not the guard
+                        // };
+                        // let db_pool = pool.lock().expect("Failed to lock db_pool").clone();
+
+                        
+                        // Try to parse the UUID
+                        match Uuid::parse_str(&room_uuid_clone) {
+                            Ok(room_uuid_parsed) => {
+                                // Check if the room exists in our mapping
+                                let sender_opt: Option<broadcast::Sender<ServerMessage>> = {
+                                    let rooms_guard = rooms.lock().await;
+                                    rooms_guard.get(&room_uuid_parsed).cloned()
+                                };
+                                
+                                // Get room and message data
+                                match get_room_with_messages(&pool, &room_uuid_clone).await {
+                                    
+                                    Ok((room, messages, member_uuids)) => {
+                                        // let message_json = serde_json::to_value(&messages).unwrap_or(json!([]));
+                                        let message_json = json!({
+                                            "messages": messages,
+                                            "member_uuids": member_uuids
+                                        });
+                                        let server_msg = ServerMessage {
+                                            msg: "Room et messages récupérés.".to_string(),
+                                            r#type: "room_with_messages".to_string(),
+                                            message: "".to_string(),
+                                            name: Some(room.name),
+                                            room_uuid: Some(room_uuid_clone.clone()),
+                                            user_uuid: None,
+                                            json: Some(message_json)
+                                        };
+                                        
+                                        (room_uuid_parsed, server_msg, true, sender_opt)
+                                    },
+                                    Err(e) => {
+                                        println!("Erreur récupération room/messages: {:?}", e);
+                                        let error_msg = ServerMessage {
+                                            msg: "Failed to retrieve room data".to_string(),
+                                            r#type: "error".to_string(),
+                                            message: format!("Database error: {}", e),
+                                            name: None,
+                                            room_uuid: Some(room_uuid_clone),
+                                            user_uuid: None,
+                                            json: None
+                                        };
+                                        
+                                        (room_uuid_parsed, error_msg, false, sender_opt)
+                                    }
+                                }
+                            },
+                            Err(_) => {
+                                let error_msg = ServerMessage {
+                                    msg: "Invalid room UUID".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: "The provided room UUID is invalid".to_string(),
+                                    name: None,
+                                    room_uuid: Some(room_uuid_clone),
+                                    user_uuid: None,
+                                    json: None
+                                };
+                                
+                                // Return a dummy UUID since the parse failed
+                                (Uuid::nil(), error_msg, false, None)
+                            }
+                        }
+                    };
+                    
+                    // Handle the future
+                    ctx.spawn(
+                        fut::wrap_future(fut)
+                            .map(move |(room_uuid_parsed, server_msg, success, sender_opt), _, ctx: &mut WebsocketContext<MyWebSocket> | {
+                                // Send the response to the client
+                                let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                                ctx.text(json);
+                                
+                                // If successful and we have a sender, set up room subscription
+                                if success {
+                                    if let Some(sender) = sender_opt {
+                                        // Subscribe to the room's broadcast channel
+                                        let mut rx = sender.subscribe();
+                                        let addr = ctx.address();
+                                        
+                                        // Set up a separate task to listen for room messages
+                                        actix::spawn(async move {
+                                            while let Ok(msg) = rx.recv().await {
+                                                let json = serde_json::to_string(&msg).unwrap_or_default();
+                                                let _ = addr.send(MyMessage(json)).await;
+                                            }
+                                        });
+                                    }
+                                }
+                            }),
+                    );
+                }
+                
+                Ok(ClientMessage::Chat { room_uuid, message }) => {
+                    println!("Message dans room {:?}: {}", room_uuid, message);
+                
+                    // Clone all necessary data before moving into async context
+                    // let pool: Arc<Mutex<SqlitePool>> = Arc::clone(&self.db_pool);
+                    let pool = self.db_pool.clone();
+                    let uuid = self.user_uuid.clone();
+                    let room_uuid_clone = room_uuid.clone();
+                    
+                    // Parse UUID once before the lock
+                    match Uuid::parse_str(&room_uuid) {
+                        Ok(room_uuid_parsed) => {
+                            let rooms = self.rooms.clone(); // clone pour use dans le async move
+                                            
+                            // Create a future to handle the database operations
+                            let fut = async move {
+                                // Important: Lock the pool briefly just to get a connection
+                                // Get the sender outside of the async block
+                                let sender_opt = {
+                                    let rooms = rooms.lock().await; //moved here because need async
+                                    rooms.get(&room_uuid_parsed).cloned()
+                                };
+                                
+                                // Check if user is in room - with proper error handling
+                                let is_member = match is_user_in_room(&pool, &room_uuid_clone, &uuid).await {
+                                    Ok(result) => result,
+                                    Err(e) => {
+                                        eprintln!("Error checking room membership: {:?}", e);
+                                        return (sender_opt, ServerMessage {
+                                            msg: "Error checking room membership".into(),
+                                            r#type: "error".into(),
+                                            message: format!("Failed to verify membership: {}", e),
+                                            name: None,
+                                            room_uuid: Some(room_uuid_clone),
+                                            user_uuid: Some(uuid),
+                                            json: None,
+                                        });
+                                    }
+                                };
+                
+                                if !is_member {
+                                    return (sender_opt, ServerMessage {
+                                        msg: "Not a member of this room".into(),
+                                        r#type: "error".into(),
+                                        message: "You are not a member of this room".into(),
+                                        name: None,
+                                        room_uuid: Some(room_uuid_clone),
+                                        user_uuid: Some(uuid),
+                                        json: None,
+                                    });
+                                }
+                
+                                // Insert message
+                                if let Err(e) = insert_message(&pool, &room_uuid_clone, &uuid, &message).await {
+                                    eprintln!("Error inserting message: {:?}", e);
+                                    return (sender_opt, ServerMessage {
+                                        msg: "Failed to save message".into(),
+                                        r#type: "error".into(),
+                                        message: format!("Database error: {}", e),
+                                        name: None,
+                                        room_uuid: Some(room_uuid_clone),
+                                        user_uuid: Some(uuid),
+                                        json: None,
+                                    });
+                                    
+                                }
+                
+                                // Get user name
+                                let user_name = match get_user_name(&pool, &uuid).await {
+                                    Ok(name) => name,
+                                    Err(_) => "Anonymous".into(),
+                                };
+                
+                                let created_at = chrono::Utc::now().format("%d/%m/%Y %H:%M:%S").to_string();
+                
+                                // Create the message to broadcast
+                                let server_msg = ServerMessage {
+                                    msg: "Nouveau message".into(),
+                                    r#type: "new_message".into(),
+                                    message: message.clone(),
+                                    name: Some(user_name.clone()),
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(uuid.clone()),
+                                    json: Some(json!({
+                                        "content": message,
+                                        "created_at": created_at,
+                                        "user_name": user_name,
+                                        "room_uuid": room_uuid_clone,
+                                        "user_uuid": uuid,
+                                    })),
+                                };
+                                (sender_opt, server_msg)
+                            };
+                
+                            // Handle the future result
+                            ctx.spawn(
+                                fut::wrap_future(fut)
+                                    .map(move |(sender_opt, server_msg), _, ctx: &mut WebsocketContext<MyWebSocket> | {
+                                        // If there's an error message, just send it to the requesting user
+                                        if server_msg.r#type == "error" {
+                                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                                            ctx.text(json);
+                                            return;
+                                        }
+                
+                                        // If successful, broadcast to all users in the room
+                                        if let Some(sender) = sender_opt {
+                                            let _ = sender.send(server_msg.clone());
+                                        }
+                
+                                        // Also confirm to the sender
+                                        // let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                                        // ctx.text(json);
+                                    }),
+                            );
+                        },
+                        Err(_) => {
+                            let error_msg = ServerMessage {
+                                msg: "Invalid room UUID format".into(),
+                                r#type: "error".into(),
+                                message: "The provided room UUID is invalid".into(),
+                                name: None,
+                                room_uuid: Some(room_uuid),
+                                user_uuid: Some(self.user_uuid.clone()),
+                                json: None,
+                            };
+                            let json = serde_json::to_string(&error_msg).unwrap_or_default();
+                            ctx.text(json);
+                        }
+                    }
+                }
+                
+                Ok(ClientMessage::GetUsersData{}) => {
+                    println!("\n\n\n\nRécupération des utilisateurs pour:\n\n\n\n");
+                    let pool = self.db_pool.clone();
+                    let user_uuid = self.user_uuid.clone();
+                    let mut username = "Anonyme".to_string();
+
+                    let fut = async move {
+
+                        if user_uuid.clone() != "" {
+                            if let Ok(name) = get_user_name(&pool, &user_uuid).await {
+                                username = name;
+                            }
+                        };
+                        match get_list_users(&pool, username).await {
+                            Ok(list_users) => {
+                                let message_json = serde_json::to_value(&list_users).unwrap_or(json!([]));
+                                let server_msg = ServerMessage {
+                                    msg: "Utilisateurs récupérés.".to_string(),
+                                    r#type: "list_users".to_string(),
+                                    message: "".to_string(),
+                                    name: None,
+                                    room_uuid: None,
+                                    user_uuid: None,
+                                    json: Some(message_json)
+                                };
+                                
+                                server_msg
+                                
+                            },
+                            Err(e) => {
+                                println!("Erreur récupération room/messages: {:?}", e);
+                                let error_msg = ServerMessage {
+                                    msg: "Failed to retrieve room data".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: format!("Database error: {}", e),
+                                    name: None,
+                                    room_uuid: None,
+                                    user_uuid: None,
+                                    json: None
+                                };
+                                error_msg
+                            }
+                        }
+                    };
+                    ctx.spawn(
+                    fut::wrap_future(fut)
+                    .map(move |server_msg, _, ctx: &mut WebsocketContext<MyWebSocket> | {
+                            // Send the response to the client
+                            if server_msg.r#type == "error" {
+                                let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                                ctx.text(json);
+                                return;
+                            }
+                            // Also confirm to the sender
+                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                            ctx.text(json);
+                        })
+                    );
+                }
+
                 Ok(ClientMessage::AddRoomMembers{ room_uuid, invitees }) => {
                     println!("\x1b[0;31m AddRoomMembers! \x1b[0m");
                     let pool = self.db_pool.clone();
@@ -314,7 +615,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                 };
                                 
                                 // Notification à chaque invité
-                                let manager = CONNECTION_MANAGER.lock().unwrap();
+                                let manager = CONNECTION_MANAGER.lock().await;
                                 for invitee_uuid in &invitees_clone {
                                     let dm = DirectMessage {
                                         content: format!("Vous avez été ajouté à la room '{}'", room_uuid_clone),
@@ -329,7 +630,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                 // Récupérer le sender pour la room
                                 let mut sender_opt = None;
                                 if let Ok(room_uuid_parsed) = Uuid::parse_str(&room_uuid_clone) {
-                                    let rooms_guard = rooms.lock().unwrap();
+                                    let rooms_guard = rooms.lock().await;
                                     sender_opt = rooms_guard.get(&room_uuid_parsed).cloned();
                                 }
                                 
@@ -357,182 +658,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                             }
                             let json = serde_json::to_string(&server_msg).unwrap_or_default();
                             ctx.text(json);
-                        }),
-                    );
-                }
-                
-                Ok(ClientMessage::DirectMessage { target_user, message }) => {
-                    println!("Message direct: {} -> {}: {}", self.user_uuid, target_user, message);
-                    
-                    // Récupérer les informations de l'expéditeur
-                    let pool = self.db_pool.clone();
-                    let sender_uuid = self.user_uuid.clone();
-                    
-                    // Clone nécessaire pour move dans le future
-                    let target_uuid = target_user.clone();
-                    let message_content = message.clone();
-                    
-                    // Créer un futur pour traiter le message
-                    let fut = async move {
-                        // Récupérer le pseudo de l'expéditeur pour l'inclure dans le message
-                        let sender_info = sqlx::query(
-                            "SELECT pseudo FROM users WHERE uuid = ?")
-                        .bind(sender_uuid)
-                        .fetch_optional(&pool)
-                        .await;
-                        
-                        let sender_name = match sender_info {
-                            Ok(Some(row)) => row.get("pseudo"),
-                            _ => "Utilisateur inconnu".to_string(),
-                        };
-                        
-                        // Vérifier si l'utilisateur cible existe
-                        let target_exists = sqlx::query_as(
-                            "SELECT COUNT(*) as count FROM users WHERE uuid = ?")
-                        .bind(target_uuid)
-                        .fetch_one(&pool)
-                        .await
-                        .map(|row: (i32, )| row.0 > 0)
-                        .unwrap_or(false);
-                        
-                        if !target_exists {
-                            return ServerMessage {
-                                msg: "Utilisateur introuvable".to_string(),
-                                r#type: "error".to_string(),
-                                message: "L'utilisateur cible n'existe pas".to_string(),
-                                name: None,
-                                room_uuid: None,
-                                user_uuid: None,
-                                json: None,
-                            };
-                        }
-                        
-                        // Enregistrer le message dans la base de données
-                        let message_result = sqlx::query(
-                            "INSERT INTO direct_messages (sender_uuid, receiver_uuid, content, sent_at) 
-                             VALUES (?, ?, ?, datetime('now')) RETURNING id")
-                        .bind(sender_uuid)
-                        .bind(target_uuid)
-                        .bind(message_content)
-                        .fetch_one(&pool)
-                        .await;
-                        
-                        let message_id = match message_result {
-                            Ok(row) => row.get("id"),
-                            Err(_) => 0,  // Valeur par défaut en cas d'erreur
-                        };
-                        
-                        // Créer le message à envoyer
-                        let dm = DirectMessage {
-                            content: message_content,
-                            message_type: "direct_message".to_string(),
-                            from_user: sender_uuid,
-                            room_uuid: None,
-                            extra_data: Some(json!({
-                                "sender_name": sender_name,
-                                "message_id": message_id,
-                                "timestamp": chrono::Utc::now().to_rfc3339()
-                            })),
-                        };
-                        
-                        // Envoyer le message
-                        let manager = CONNECTION_MANAGER.lock().unwrap();
-                        let delivered = manager.send_direct_message(&target_uuid, dm);
-                        
-                        // Message de confirmation pour l'expéditeur
-                        ServerMessage {
-                            msg: if delivered { "Message envoyé".to_string() } else { "Message enregistré, mais utilisateur hors ligne".to_string() },
-                            r#type: "direct_message_status".to_string(),
-                            message: message_content,
-                            name: None,
-                            room_uuid: None,
-                            user_uuid: Some(target_uuid),
-                            json: Some(json!({
-                                "delivered": delivered,
-                                "message_id": message_id,
-                                "timestamp": chrono::Utc::now().to_rfc3339()
-                            })),
-                        }
-                    };
-                    
-                    // Exécuter le futur
-                    ctx.spawn(
-                        fut::wrap_future(fut).map(|server_msg, _, ctx: &mut WebsocketContext<MyWebSocket>| {
-                            if let Ok(json) = serde_json::to_string(&server_msg) {
-                                ctx.text(json);
-                            }
-                        }),
-                    );
-                }
-                
-                // Ajout d'un nouveau type de message pour récupérer les messages directs non lus
-                Ok(ClientMessage::GetUnreadMessages {}) => {
-                    let pool = self.db_pool.clone();
-                    let user_uuid = self.user_uuid.clone();
-                    
-                    let fut = async move {
-                        // Récupérer les messages non lus pour cet utilisateur
-                        let unread_msgs = sqlx::query(
-                            "SELECT dm.id, dm.sender_uuid, dm.content, dm.sent_at, u.pseudo as sender_name
-                             FROM direct_messages dm
-                             JOIN users u ON u.uuid = dm.sender_uuid
-                             WHERE dm.receiver_uuid = ? AND dm.read_at IS NULL
-                             ORDER BY dm.sent_at DESC")
-                            .bind(user_uuid)
-                        .fetch_all(&pool)
-                        .await;
-                        
-                        match unread_msgs {
-                            Ok(messages) => {
-                                // Convertir les messages en format JSON
-                                let messages_json: Vec<serde_json::Value> = messages.iter().map(|msg| {
-                                    json!({
-                                        "id": msg.get("id"),
-                                        "sender_uuid": msg.get("sender_uuid"),
-                                        "sender_name": msg.get("sender_name"),
-                                        "content": msg.get("content"),
-                                        "sent_at": msg.get("sent_at")
-                                    })
-                                }).collect();
-                                
-                                // Marquer les messages comme lus
-                                let _ = sqlx::query(
-                                    "UPDATE direct_messages SET read_at = datetime('now')
-                                     WHERE receiver_uuid = ? AND read_at IS NULL")
-                                    .bind(user_uuid)
-                                    .execute(&pool)
-                                    .await;
-                                
-                                ServerMessage {
-                                    msg: format!("{} messages non lus", messages.len()),
-                                    r#type: "unread_messages".to_string(),
-                                    message: format!("{} messages non lus", messages.len()),
-                                    name: None,
-                                    room_uuid: None,
-                                    user_uuid: None,
-                                    json: Some(json!({
-                                        "messages": messages_json,
-                                        "count": messages.len()
-                                    })),
-                                }
-                            },
-                            Err(e) => ServerMessage {
-                                msg: "Erreur lors de la récupération des messages".to_string(),
-                                r#type: "error".to_string(),
-                                message: format!("Erreur BDD: {}", e),
-                                name: None,
-                                room_uuid: None,
-                                user_uuid: None,
-                                json: None,
-                            },
-                        }
-                    };
-                    
-                    ctx.spawn(
-                        fut::wrap_future(fut).map(|server_msg, _, ctx: &mut WebsocketContext<MyWebSocket>| {
-                            if let Ok(json) = serde_json::to_string(&server_msg) {
-                                ctx.text(json);
-                            }
                         }),
                     );
                 }

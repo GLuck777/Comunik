@@ -1,4 +1,6 @@
 mod handlers;           // Ajoute le fichier handlers.rs
+mod gestion_log;
+use gestion_log::*;
 use handlers::*;        // Cela permet d'utiliser les fonctions définies dans handlers.rs
 mod sql_req;
 use std::env;
@@ -6,8 +8,8 @@ use env_logger;
 mod ws_init;
 mod connection_manager;
 use connection_manager::ConnectionManager;
-use std::sync::Arc; // utilisé pour app_state.connection_manager pour l'async
-use tokio::sync::Mutex;
+
+use tokio::sync::Mutex; // cree des conflits avec std sync
 
 
 
@@ -17,19 +19,18 @@ use actix_web_actors::ws as other_ws;
 mod ws;
 use actix_session::{Session}; // supprime CookieSession
 use tera::Tera;  // Pour les templates
-// use std::sync::Arc;
-// use uuid::Uuid;  // Pour générer des UUID
 use sqlx::SqlitePool;
-// use actix_web::{App, HttpServer, middleware};
+
 use actix_session::{SessionMiddleware, storage::CookieSessionStore};
 use actix_web::cookie::Key;
 use actix_files::Files; // Pour ajouter le CSS dans les pages
 
 // New imports
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc}; // utilisé pour app_state.connection_manager pour l'async
 use std::collections::HashMap;
 use uuid::Uuid;
 use tokio::sync::broadcast;
+
 use crate::ws::ServerMessage;
 
 #[derive(Debug, Clone)]
@@ -105,7 +106,9 @@ async fn main() -> std::io::Result<()> {
     println!("Serveur démarré sur http://localhost:8080");
     let pool = SqlitePool::connect("sqlite:./app.db").await.unwrap();
 
+    // let rooms = Arc::new(Mutex::new(HashMap::new()));
     let rooms = Arc::new(Mutex::new(HashMap::new()));
+
     
     // Initialize room broadcast channels from database
     if let Err(e) = ws_init::initialize_rooms(&pool, &rooms).await {
@@ -114,6 +117,7 @@ async fn main() -> std::io::Result<()> {
     let app_state = AppState {
         db_pool: pool.clone(),
         rooms: rooms.clone(),
+        connection_manager: connection_manager.clone(),
     };
 
     HttpServer::new(move|| {
@@ -129,6 +133,7 @@ async fn main() -> std::io::Result<()> {
             .cookie_secure(false) // pour local, true en prod
             .cookie_name("comunik_session".to_string()) // optionnel
             .build())
+            .service(web::scope("/admin").route("/online-users", web::get().to(online_users)))
             .service(Files::new("/static", "./static").show_files_listing()) // enlever show_files_listening une fois le developpement effectué
             .service(web::resource("/access").route(web::get().to(handlers::access_form)).route(web::post().to(handlers::access_check)))
             .service(web::resource("/login").route(web::get().to(handlers::login_form)).route(web::post().to(handlers::login_post)))

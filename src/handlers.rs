@@ -231,6 +231,18 @@ pub async fn login_post(
                                 // Nous ne pouvons pas encore enregistrer de connection (websocket), 
                                 // mais nous pouvons stocker les données
                                 manager.user_data.insert(uuid.clone(), user_data).unwrap();
+                                println!("=== Utilisateurs connectés ===");
+                                for (uuid, data) in manager.user_data.iter() {
+                                    println!("- UUID: {}", uuid);
+                                    println!("  Email: {}", data.email);
+                                    println!("  Pseudo: {}", data.pseudo);
+                                    if let Some(addr) = manager.user_connections.get(uuid) {
+                                        println!("  WebSocket actif: ✅");
+                                    } else {
+                                        println!("  WebSocket actif: ❌");
+                                    }
+                                }
+                                println!("==============================");
                             }
 
                             // return HttpResponse::Found()
