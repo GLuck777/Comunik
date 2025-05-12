@@ -4,6 +4,10 @@ mod sql_req;
 use std::env;
 use env_logger;
 mod ws_init;
+mod connection_manager;
+use connection_manager::ConnectionManager;
+use std::sync::Arc; // utilisé pour app_state.connection_manager pour l'async
+use tokio::sync::Mutex;
 
 
 
@@ -30,8 +34,9 @@ use crate::ws::ServerMessage;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
-    db_pool: SqlitePool,
-    rooms: Arc<Mutex<HashMap<Uuid, broadcast::Sender<ServerMessage>>>>,
+    pub db_pool: SqlitePool,
+    pub rooms: Arc<Mutex<HashMap<Uuid, broadcast::Sender<ServerMessage>>>>,
+    pub connection_manager: Arc<Mutex<ConnectionManager>>,
 }
 
 // Perform WebSocket handshake and start actor.
@@ -92,6 +97,10 @@ async fn main() -> std::io::Result<()> {
     //let secret_key = Key::from(&[0; 64]); // 64 bytes (mauvais en prod, mais ok pour tests)
     let secret_key = Key::from(b"0123456789012345678901234567890123456789012345678901234567890123");
 
+    // Créer l'instance du gestionnaire de connexions
+    let connection_manager = Arc::new(Mutex::new(ConnectionManager::new()));
+    // Cloner pour le partager avec l'application
+    let app_data = web::Data::new(connection_manager.clone());
 
     println!("Serveur démarré sur http://localhost:8080");
     let pool = SqlitePool::connect("sqlite:./app.db").await.unwrap();
@@ -112,6 +121,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
             .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(app_data.clone()))
             .wrap(SessionMiddleware::builder(
                 CookieSessionStore::default(),
                 secret_key.clone(),

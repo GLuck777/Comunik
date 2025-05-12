@@ -431,6 +431,11 @@
     }
 
     switch (parsed.type) {
+      case 'direct_message':
+        console.log(`Message privé de ${parsed.user_uuid}: ${parsed.message}`);
+        // Afficher la notification de message privé
+        displayPrivateMessage(parsed);
+        break;
       case "room_created":
         // console.log("room_created fetch puis display")
         const res = await fetch(`/api/notifications/${parsed.user_uuid}`);
@@ -468,10 +473,37 @@
           const msg = parsed;
           displayIncomingMessage(msg);
         break;
+      case "add_members_clear":
+        displayAllNotifs()
+        console.log("ajout du/des membres avec succes!")
+        //ajout du membre dans la liste ajout articifiel pas un fetch
+        let list_coll = document.getElementById("roomColleagues");
+        let collegue = document.createElement("li");
+        collegue.className="liste_collegue";
+        // lien dans le futur pour son profil
+        let lienCol = document.createElement("a")
+        lienCol.id = "uuid du membre"; // ##################################
+        lienCol.textContent = "nouveau membre"; // ##################################
+        lienCol.href = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
+        // div suppr membre
+        svgCol = document.createElement("div")
+        svgCol.className = "redCalliberSvg"
+        svgCol.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="64" stroke-dashoffset="64" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="64;0"/></path><path stroke-dasharray="8" stroke-dashoffset="8" d="M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="8;0"/></path></g></svg'
+        collegue.appendChild(lienCol);
+        collegue.appendChild(svgCol);
+        list_coll.appendChild(collegue);
+        break;
+      case 'direct_message_sent':
+        console.log(`Message bien envoyé à ${parsed.user_uuid}`);
+        break;
+      case 'direct_message_failed':
+        console.log(`Échec d'envoi du message à ${parsed.user_uuid}: ${parsed.message}`);
+        break;
       case "error":
         console.error("Erreur : " + parsed.message);
         break;
       default:
+        console.log('Message reçu:', parsed);
         break;
     }
   }
@@ -505,6 +537,16 @@
     
   }
   
+  // Fonction pour envoyer un message privé PAS ENCORE IMPLEMENTER
+  function sendDirectMessage(targetUserUuid, message) {
+    const messageData = {
+      type: 'direct_message',
+      target_user: targetUserUuid,
+      message: message
+    };
+    
+    ws.send(JSON.stringify(messageData));
+  }
   //systeme d'affichage temporaire
   function displayTempListUser(json){
     // pour la prochaine verification en bac avant le fetch si l'user est deja follow, son statut...

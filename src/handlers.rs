@@ -1,5 +1,5 @@
 // use tools::*;
-use crate::sql_req::*;
+use crate::{sql_req::*, AppState};
 
 use actix_web::{web, HttpResponse, Responder};
 use actix_session::Session;
@@ -10,6 +10,9 @@ use sqlx::{SqlitePool, Row, FromRow};
 use rand::{Rng, distributions::Alphanumeric};
 use argon2::{Argon2, PasswordHasher, PasswordVerifier, PasswordHash as PH};
 use password_hash::{SaltString, PasswordHash, rand_core::OsRng};
+
+// new 
+use crate::connection_manager::UserData;
 
 // use std::io::{self, Read};
 use crate::render;
@@ -138,10 +141,15 @@ pub async fn login_form(session: Session) -> impl Responder {
     render("login.html", ctx)
 }
 
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use crate::ConnectionManager;
 pub async fn login_post(
     form: web::Form<LoginForm>,
     pool: web::Data<SqlitePool>,
     session: Session,
+    // connection_manager: web::Data<Arc<Mutex<ConnectionManager>>>, // Nouveau paramètre
+    app_state: web::Data<AppState>
 ) -> impl Responder {
     let row = sqlx::query(
         "SELECT uuid, pseudo, password FROM users WHERE email = ? LIMIT 1"
@@ -149,6 +157,7 @@ pub async fn login_post(
         .bind(&form.email) // Bind de l'email
         .fetch_optional(pool.get_ref()) // Récupère la ligne correspondante
         .await;
+
         match row {
             Ok(Some(row)) => {
                 // Extraire le UUID et le mot de passe hashé de la ligne
@@ -201,6 +210,28 @@ pub async fn login_post(
                             ctx.insert("username", &pseudo); // ou "pseudo"
 
                             println!("Utilisateur connecté : {} ({}) - uuid: {}", pseudo, email, uuid);
+                            //new instance for register data
+                            // Enregistrer les données de l'utilisateur dans le ConnectionManager
+                            // Même si le websocket n'est pas encore connecté, ces données seront disponibles
+                            // info apprentissage sur les {...}:
+
+                            // bloc de portée (scope), et c'est une protection explicite.Et ce verrou (manager) reste actif tant qu’il est en vie. Si tu ne le libères pas, le verrou est conservé jusqu'à la fin de la fonction — ce qui peut bloquer d’autres tâches qui veulent aussi accéder à ce Mutex.
+                            // En plaçant cette opération dans un bloc { ... } :
+                            // Tu restreins la durée de vie du verrou, donc :
+                            //  manager est drop() dès que le bloc se termine.
+                            // Le Mutex est libéré plus tôt, permettant à d'autres .lock().await d’accéder à connection_manager.
+                            {
+                                let mut manager = app_state.connection_manager.lock().await;
+                                let user_data = UserData {
+                                    email: form.email.clone(),
+                                    pseudo: pseudo.clone(),
+                                    last_activity: chrono::Utc::now(),
+                                };
+                                
+                                // Nous ne pouvons pas encore enregistrer de connection (websocket), 
+                                // mais nous pouvons stocker les données
+                                manager.user_data.insert(uuid.clone(), user_data).unwrap();
+                            }
 
                             // return HttpResponse::Found()
                             // .append_header(("Location", "/home"))
