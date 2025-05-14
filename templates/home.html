@@ -9,8 +9,10 @@
   <link rel="stylesheet" type="text/css" href="/static/css/home.css">
   <link rel="stylesheet" type="text/css" href="/static/css/header.css">
   <link rel="stylesheet" type="text/css" href="/static/css/messages.css">
+  <link rel="stylesheet" type="text/css" href="/static/css/bg_canvas.css"> 
 </head>
 <body class="bg-line">
+  <canvas id="matrixCanvas"></canvas>
   <header>
     <a href="/home" class="logo"><img src="/static/ressources/logoU.png" alt="logoU"></a>
     <div class="header-actions">
@@ -49,29 +51,36 @@
     </div>
   </div>
   <!-- Fin Notification -->
-  <div class="corpus_holmes">
-    <div>
+  <div class="corpus_holmes identity">
+    <div class="form_room">
       <p>Connecté en tant que : <strong>{{ username }}</strong> ({{ email }})  {{ uuid }}</p>
       <input type="hidden" id="uuid" value="{{ uuid }}">
       <!-- Bouton pour ouvrir le modal -->
-      <button id="open-room-modal">Créer une Room</button>
+      <button id="open_room_modal" class="open_room_modal">Créer une Room</button>
       <!-- Modal -->
-      <div id="room-modal" style="display:none;">
+      <div id="room-modal">
         <div class="modal_add_room">
           <h3>Créer une Room</h3>
           <form id="create_room_form">
-            <label>Nom de la Room :</label>
-            <input type="text" name="room_name" required>
-
-            <label>Visibilité :</label>
-            <select name="visibility">
-              <option value="private">Privée</option>
-              <option value="public">Publique</option>
-            </select>
-
-            <label>Inviter des amis (UUID, séparés par des virgules) :</label>
-            <input type="text" name="invitees" placeholder="uuid1,uuid2,...">
-
+            <div class="form">
+              <div class="inputBox">
+                <input type="text" name="room_name" placeholder=" " required>
+                <i>Nom de la Room</i>
+              </div>
+              <div class="inputBox">
+                <select name="visibility">
+                  <option value="private">Privée</option>
+                  <option value="public">Publique</option>
+                </select>
+                <label>Visibilité</label>
+              </div>
+              <div class="inputBox">
+                <input type="text" id="invitees_input" name="invitees" placeholder=" " autocomplete="off">
+                <i>Inviter des amis</i>
+                <div id="invitees-hint">Tapez un pseudo ou UUID, cliquez pour ajouter</div>
+                <ul id="invitees_suggestions"></ul>
+              </div>
+            </div>
             <button type="submit">Créer</button>
             <button type="button" id="close-room-modal">Annuler</button>
           </form>
@@ -80,6 +89,7 @@
       <!-- fin modale-->
     </div>
   </div>
+  <div class="corpus_holmes"></div>
   <div class="corpus_holmes">
     <div class="tabs">
       <button id="btn_room" class="active-tab" onclick="showTab('room_tab')">Rooms</button>
@@ -168,8 +178,8 @@
                   <div class="choice_set">
                     <input type="text" id="new_inv" name="new_inv" placeholder="Rechercher un pseudo..." list="user_list">
                     <datalist id="user_list"></datalist>
-                    <div id="tag_container"></div>
                     <button onclick="addMembers()" style="background-color: rgb(58, 92, 24); color: #dedede;">Ajouter</button>
+                    <ul id="new_inv_suggestions" class="suggestions-box"></ul>
                   </div>
                 </div>
             
@@ -209,6 +219,7 @@
   </div><!-- fin de corpus_holmes-->
 </body>
 </html>
+<script src="/static/js/hack_er.js"></script>
 
 <script>
   // === WebSocket ===
@@ -217,6 +228,7 @@
   let current_user_uuid = document.getElementById("uuid").value;
   let liste_utilisateurs = []; // {pseudo: "Nom", uuid: "uuid"}
   let selected_users = new Map(); // pseudo -> uuid
+  let glob_room_name = null;
 
   
   // To manage each connection to the WebSocket
@@ -315,26 +327,167 @@
   // EN Travaux --> pour ajouter de/des membres à ta room
   async function addMembers(){
     console.log("Ajouter des membres pour room:", currentRoomUuid);
-    await connectToWebSocket(`/ws/${currentRoomUuid}`);
+
     const input = document.querySelector('[name="new_inv"]');
-    const invitees = input.value
+    const rawInput = input.value;
+    input.value = ''; // vider l'input dès qu'on entre dans la fonction
+
+    const invitees = rawInput
       .split(',')
       .map(x => x.trim())
       .filter(Boolean);
-    console.log("liste invitée: ", invitees);
+
+    console.log("Liste invitée brute:", invitees);
+
+    if (invitees.length === 0) {
+      console.warn("Aucun membre à ajouter.");
+      return;
+    }
+
+    // Vérifier que tous les éléments correspondent à un pseudo ou un uuid
+    const validInvitees = invitees.filter(inv =>
+      liste_utilisateurs.some(user =>
+        user.uuid === inv || user.pseudo === inv
+      )
+    );
+
+    if (validInvitees.length !== invitees.length) {
+      console.error("Certains membres ne sont pas valides.");
+      return;
+    }
+
+    await connectToWebSocket(`/ws/${currentRoomUuid}`);
+
     socket.onopen = () => {
       try {
-        socket.send(JSON.stringify({ 
-        type: "add_members", 
-        room_uuid: currentRoomUuid,
-        invitees: invitees,
+        socket.send(JSON.stringify({
+          type: "add_members",
+          room_uuid: currentRoomUuid,
+          invitees: validInvitees,
         }));
       } catch (e) {
         console.error("Error opening room:", e);
-        return false;
+      }
+    };
+  }
+  
+  async function editRoomName(){
+    console.log("Modifier le nom de ma room:", currentRoomUuid);
+
+    await connectToWebSocket(`/ws/${currentRoomUuid}`);
+    const input = document.querySelector('[name="change_Rname"]');
+    const newName = input.value.trim();
+
+    // Conditions de validation
+    const isSameName = newName === glob_room_name;
+    const isTooShort = newName.length < 4;
+    const isEmpty = newName === "";
+    const hasDangerousChars = /['"\\;%]/.test(newName); // ajoute ou modifie ce regex selon ton niveau de sécurité
+
+    if (isSameName || isTooShort || isEmpty || hasDangerousChars) {
+      console.warn("Nom invalide ou inchangé, aucune requête envoyée.");
+      return;
+    }
+
+    socket.onopen = () => {
+      try {
+        socket.send(JSON.stringify({ 
+          type: "change_room_name", 
+          room_uuid: currentRoomUuid,
+          content: newName
+        }));
+      } catch (e) {
+        console.error("Erreur lors de l'envoi du nom de room :", e);
+      }
+    };
+  }
+
+  // Permet de supprimer un membre dans une room a tester
+  async function deleteMember(member_uuid){
+    console.log("member_uuid ultime: ", member_uuid);
+    console.log("uuid room: ", currentRoomUuid);
+
+    console.log("verification des informations: membre ciblé:", member_uuid, "membre actuel:", current_user_uuid)
+    if (member_uuid != current_user_uuid){
+      console.log("j'entre ici")
+      await connectToWebSocket(`/ws/${currentRoomUuid}`);
+      
+      socket.onopen = () => {
+        try {
+          socket.send(JSON.stringify({ 
+          type: "delete_member", 
+          room_uuid: currentRoomUuid,
+          member_uuid: member_uuid,
+          }));
+        } catch (e) {
+          console.error("Error opening room:", e);
+          return false;
+        }
       }
     }
+
   }
+
+  // Quand on ajoute un membre à la room, function qui ajoute à la liste le membre, FRONT fetch FCT
+  async function fetchMember(parsed) {
+    const members = parsed.json?.members || [];
+    console.log("members ajoutés: ", members);
+
+    const list_coll = document.getElementById("roomColleagues");
+    list_coll.textContent = "";
+
+    members.forEach(member => {
+        const uuid = member.uuid;
+        const pseudo = member.pseudo;
+        const owner = member.owner;
+
+        // Crée un <li> pour le collègue
+        const collegue = document.createElement("li");
+        collegue.className = "liste_collegue";
+
+        // Crée le lien vers le profile
+        const lienCol = document.createElement("a");
+        lienCol.id = uuid;
+        lienCol.textContent = pseudo;
+        lienCol.target = "_blank";
+        lienCol.href = `/profile/${uuid}`;
+
+        if (owner){
+          pngCol = document.createElement("div");
+          pngCol.className = "CalliberPng";
+          pngCol.innerHTML = '<img src="/static/ressources/icons/crown.png" style="width: 100%;"/>';
+        }
+
+        // Div pour bouton de suppression (SVG)
+        const svgCol = document.createElement("div");
+        svgCol.className = "redCalliberSvg";
+        svgCol.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                    <path stroke-dasharray="64" stroke-dashoffset="64" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z">
+                        <animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="64;0"/>
+                    </path>
+                    <path stroke-dasharray="8" stroke-dashoffset="8" d="M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4">
+                        <animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="8;0"/>
+                    </path>
+                </g>
+            </svg>`;
+        svgCol.addEventListener('click', () => {
+          if (confirm("Supprimer ce membre ?")) {
+            deleteMember(member.uuid);
+          }
+        });
+
+        // Ajout au DOM
+        collegue.appendChild(lienCol);
+        if (owner){
+          collegue.appendChild(pngCol);
+        }
+        collegue.appendChild(svgCol);
+        list_coll.appendChild(collegue);
+    });
+  }
+
 
   async function settings(){
     console.log("setting", currentRoomUuid);
@@ -476,23 +629,17 @@
       case "add_members_clear":
         displayAllNotifs();
         console.log("ajout du/des membres avec succes!")
-        //ajout du membre dans la liste ajout articifiel pas un fetch
-        let list_coll = document.getElementById("roomColleagues");
-        let collegue = document.createElement("li");
-        collegue.className="liste_collegue";
-        // lien dans le futur pour son profil
-        let lienCol = document.createElement("a")
-        lienCol.id = "uuid du membre"; // ##################################
-        lienCol.textContent = "nouveau membre"; // ##################################
-        lienCol.target = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
-        lienCol.href = "/profil/"+"uuid_membre"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
-        // div suppr membre
-        svgCol = document.createElement("div")
-        svgCol.className = "redCalliberSvg"
-        svgCol.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="64" stroke-dashoffset="64" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="64;0"/></path><path stroke-dasharray="8" stroke-dashoffset="8" d="M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="8;0"/></path></g></svg'
-        collegue.appendChild(lienCol);
-        collegue.appendChild(svgCol);
-        list_coll.appendChild(collegue);
+        fetchMember(parsed);
+        break;
+      case "suppr_members_clear":
+        displayAllNotifs();
+        console.log("membres supprimés avec succes!")
+        fetchMember(parsed);
+        break;
+      case "name_change_clear":
+        console.log("name_change_clear", parsed.name);
+        document.getElementById("room_name").textContent = parsed.name
+        glob_room_name = parsed.name;
         break;
       case 'direct_message_sent':
         console.log(`Message bien envoyé à ${parsed.user_uuid}`);
@@ -551,7 +698,7 @@
   //systeme d'affichage temporaire
   function displayTempListUser(json){
     // pour la prochaine verification en bac avant le fetch si l'user est deja follow, son statut...
-    // prochaine maj ajouter accès au profil utilisateur (si utile)
+    // prochaine maj ajouter accès au profile utilisateur (si utile)
     let list_user = document.getElementById('list_user');
     let datalist = document.getElementById('user_list');
     datalist.innerHTML = ""; // Clear previous options
@@ -595,6 +742,7 @@
     
 
     name_room.textContent = messages.name;
+    glob_room_name = messages.name; // variable globale
     message_content.innerHTML = "";
 
     let lastDate = "";
@@ -662,11 +810,38 @@
       let lienCol = document.createElement("a")
       lienCol.id = member.uuid;
       lienCol.textContent = member.pseudo;
-      lienCol.href = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profil du pseudo
-      svgCol = document.createElement("div")
-      svgCol.className = "redCalliberSvg"
-      svgCol.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path stroke-dasharray="64" stroke-dashoffset="64" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z"><animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="64;0"/></path><path stroke-dasharray="8" stroke-dashoffset="8" d="M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4"><animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="8;0"/></path></g></svg'
+      lienCol.href = "_blanc"; // à ajouter quand la MAJ sera la pour aller sur le profile du pseudo
+
+      if (member.owner){
+        pngCol = document.createElement("div");
+        pngCol.className = "CalliberPng";
+        pngCol.innerHTML = '<img src="/static/ressources/icons/crown.png" style="width: 100%;"/>';
+      }
+
+      svgCol = document.createElement("div");
+      svgCol.className = "redCalliberSvg";
+      svgCol.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                    <path stroke-dasharray="64" stroke-dashoffset="64" d="M12 3c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9c0 -4.97 4.03 -9 9 -9Z">
+                        <animate fill="freeze" attributeName="stroke-dashoffset" dur="0.6s" values="64;0"/>
+                    </path>
+                    <path stroke-dasharray="8" stroke-dashoffset="8" d="M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4">
+                        <animate fill="freeze" attributeName="stroke-dashoffset" begin="0.6s" dur="0.2s" values="8;0"/>
+                    </path>
+                </g>
+            </svg>`;
+      svgCol.addEventListener('click', () => {
+        if (confirm("Supprimer ce membre ?")) {
+          deleteMember(member.uuid);
+        }
+      });
       collegue.appendChild(lienCol);
+
+      if (member.owner){
+        collegue.appendChild(pngCol);
+      }
+
       collegue.appendChild(svgCol);
       
       list_coll.appendChild(collegue);
@@ -748,8 +923,8 @@
     notifications.forEach((notif) => {
       const li = document.createElement("li");
       li.innerHTML = `
+        <button class="delNotif" id="${notif.id}" onclick="deleteNotification(${notif.id})" style="margin-left:10px">❌</button>
         ${notif.message}
-        <button id="${notif.id}" onclick="deleteNotification(${notif.id})" style="margin-left:10px">❌</button>
       `;
       container.appendChild(li);
     });
@@ -777,7 +952,7 @@
 
   // === Modale création room ===
   function setupRoomModal() {
-    document.getElementById("open-room-modal").addEventListener("click", () => {
+    document.getElementById("open_room_modal").addEventListener("click", () => {
       document.getElementById("room-modal").style.display = "block";
     });
 
@@ -844,6 +1019,114 @@
     if (typeof displayAllNotifs === 'function') displayAllNotifs();
     //debut pour travailler sur les utilisateurs EN TRAVAUX
     if (typeof fetch_users === 'function') fetch_users();
+
+    // bloc de suggestion invité for room creation for smooth search
+    // const input = document.getElementById('invitees_input');
+    // const suggestionBox = document.getElementById('invitees_suggestions');
+    // input.addEventListener('input', function () {
+    //   const fullInput = this.value;
+    //   const parts = fullInput.split(',');
+    //   const currentQuery = parts[parts.length - 1].trim().toLowerCase();
+    //   suggestionBox.innerHTML = '';
+    //   if (currentQuery.length === 0) {
+    //     suggestionBox.style.display = 'none';
+    //     return;
+    //   }
+    //   // deuxieme secutrité user.uuid !== current_user_uuid
+    //   const results = liste_utilisateurs.filter(user =>
+    //     user.uuid !== current_user_uuid && (
+    //       user.pseudo.toLowerCase().includes(currentQuery) ||
+    //       user.uuid.toLowerCase().includes(currentQuery)
+    //     )
+    //   );
+    //   if (results.length > 0) {
+    //     results.forEach(user => {
+    //       const li = document.createElement('li');
+    //       li.textContent = `${user.pseudo} (${user.uuid})`;
+    //       li.dataset.uuid = user.uuid;
+    //       li.addEventListener('click', () => {
+    //         // Remplace la dernière entrée par l'UUID sélectionné
+    //         parts[parts.length - 1] = ` ${user.uuid}`;
+    //         input.value = parts.map(p => p.trim()).join(', ') + ', ';
+    //         suggestionBox.style.display = 'none';
+    //         input.focus();
+    //       });
+    //       suggestionBox.appendChild(li);
+    //     });
+    //     suggestionBox.style.display = 'block';
+    //   } else {
+    //     suggestionBox.style.display = 'none';
+    //   }
+    // });
+    function initInviteeSuggestions(inputId, suggestionBoxId) {
+      const input = document.getElementById(inputId);
+      const suggestionBox = document.getElementById(suggestionBoxId);
+
+      input.addEventListener('input', function () {
+        const fullInput = this.value;
+        const parts = fullInput.split(',');
+        const currentQuery = parts[parts.length - 1].trim().toLowerCase();
+
+        suggestionBox.innerHTML = '';
+
+        if (currentQuery.length === 0) {
+          suggestionBox.style.display = 'none';
+          return;
+        }
+
+        const results = liste_utilisateurs.filter(user =>
+          user.uuid !== current_user_uuid && (
+            user.pseudo.toLowerCase().includes(currentQuery) ||
+            user.uuid.toLowerCase().includes(currentQuery)
+          )
+        );
+
+        if (results.length > 0) {
+          results.forEach(user => {
+            const li = document.createElement('li');
+            li.textContent = `${user.pseudo} (${user.uuid})`;
+            li.dataset.uuid = user.uuid;
+
+            li.addEventListener('click', () => {
+              parts[parts.length - 1] = ` ${user.uuid}`;
+              input.value = parts.map(p => p.trim()).join(', ') + ', ';
+              suggestionBox.style.display = 'none';
+              input.focus();
+            });
+
+            suggestionBox.appendChild(li);
+          });
+
+          suggestionBox.style.display = 'block';
+        } else {
+          suggestionBox.style.display = 'none';
+        }
+      });
+
+      // décalé en dehors de l'event init pour éviter les problèmes de closure
+      document.addEventListener('click', function (e) {
+        const target = e.target;
+        const clickedInsideInput = input.contains(target);
+        const clickedInsideSuggestion = suggestionBox.contains(target);
+
+        if (!clickedInsideInput && !clickedInsideSuggestion) {
+          suggestionBox.style.display = 'none';
+        }
+      });
+    }
+
+    initInviteeSuggestions('invitees_input', 'invitees_suggestions');
+    initInviteeSuggestions('new_inv', 'new_inv_suggestions');
+
+
+    // Cacher suggestions si on clique ailleurs
+    // document.addEventListener('click', function (e) {
+    //   if (!input.contains(e.target) && !suggestionBox.contains(e.target)) {
+    //     suggestionBox.style.display = 'none';
+    //   }
+    // });
+    // fin de bloc de suggestion invité for room creation
+
     
     // REDIRECTION PATH
     document.querySelectorAll(".redir").forEach(function (button) {
@@ -860,7 +1143,7 @@
               sendMessage();
           }
       }
-  });
+    });
     
     function redirection(button, uuidDefault= current_user_uuid) {
       const id = button.id;

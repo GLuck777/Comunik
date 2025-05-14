@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   room_uuid TEXT PRIMARY KEY NOT NULL UNIQUE,
   name TEXT NOT NULL,
   owner_uuid TEXT NOT NULL,
+  visibility TEXT DEFAULT 'public',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_uuid) REFERENCES users (uuid)
 );

@@ -417,10 +417,11 @@ async fn get_rooms_for_user(pool: &web::Data<SqlitePool>, user_uuid: &str) -> Re
     let rooms = sqlx::query_as::<_, Rooms>(
         "SELECT r.id, r.room_uuid, r.name, r.owner_uuid, r.created_at, 
         (SELECT COUNT(*) FROM room_members rm WHERE rm.room_uuid = r.room_uuid) AS member_count
-         FROM users u
-         INNER JOIN room_members rm ON u.uuid = rm.user_uuid
-         INNER JOIN rooms r ON rm.room_uuid = r.room_uuid
-         WHERE u.uuid = ?"
+        FROM users u
+        INNER JOIN room_members rm ON u.uuid = rm.user_uuid
+        INNER JOIN rooms r ON rm.room_uuid = r.room_uuid
+        WHERE u.uuid = ? 
+        ORDER BY r.created_at DESC"
     )
     .bind(user_uuid)
     .fetch_all(pool.get_ref())
@@ -478,16 +479,18 @@ async fn save_message(pool: &SqlitePool, room_uuid: &str, user_uuid: &str, conte
         .await
         .expect("Failed to insert message into database");
 }
-// Fonction pour récupérer les notifications depuis la base de données
+
+// Fonction pour récupérer les notifications depuis la base de données à chaque fois
 // GET /api/notif/
 pub async fn get_user_notifications(
     pool: web::Data<SqlitePool>,
     user_uuid: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     println!("IXION get user notification");
+    
     let user_uuid = user_uuid.into_inner();
     let result = sqlx::query_as::<_, Notification>(
-        "SELECT id, user_uuid, message FROM notifications WHERE user_uuid = ?"
+        "SELECT id, user_uuid, message FROM notifications WHERE user_uuid = ? ORDER BY created_at DESC"
     )
     .bind(&user_uuid)
     .fetch_all(pool.get_ref())
@@ -501,6 +504,7 @@ pub async fn get_user_notifications(
         }
     }
 }
+
 // GET /api/notifications/:user_uuid
 pub async fn get_notifications(
     pool: web::Data<SqlitePool>,
@@ -594,6 +598,7 @@ pub async fn profile(session: Session, pool: web::Data<SqlitePool>) -> impl Resp
         .append_header(("Location", "/login"))
         .finish()
 }
+
 pub async fn profile_uuid(
     path: web::Path<String>,
     session: Session,
@@ -612,7 +617,6 @@ pub async fn profile_uuid(
 
     match row {
         Ok(Some(row)) => {
-            
             let email: String = row.get("email");
             let pseudo: String = row.get("pseudo");
 

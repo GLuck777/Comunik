@@ -1,0 +1,161 @@
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
+
+pan {
+    position: relative;
+    display: block;
+    width: calc(6.25vw - 2px);
+    height: calc(6.25vw - 2px);
+    background: #181818;
+    z-index: 2;
+    transition: 1.5s;
+}
+
+pan:hover {
+    background: #0f0;
+    transition: 0s;
+}
+
+signin {
+    position: absolute;
+    width: 400px;
+    background: #222;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    border-radius: 4px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.9);
+}
+
+#room-modal {
+    display: none;
+    background-color: rgba(0, 0, 0, 0.7);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.modal_add_room {
+    background-color: #045007;
+    padding: 2rem;
+    border-radius: 10px;
+    width: 400px;
+    color: white;
+    box-shadow: 0 0 10px #000;
+}
+
+.modal_add_room h3 {
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: white;
+}
+
+.form .inputBox {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.form .inputBox input,
+.form .inputBox select {
+    width: 100%;
+    padding: 12px 10px;
+    font-size: 1rem;
+    color: white;
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid white;
+    outline: none;
+}
+
+.form .inputBox input::placeholder {
+    color: transparent;
+}
+
+.form .inputBox i,
+.form .inputBox label {
+    position: absolute;
+    left: 10px;
+    top: 12px;
+    pointer-events: none;
+    font-style: normal;
+    color: white;
+    transition: 0.2s;
+}
+
+.form .inputBox input:focus + i,
+.form .inputBox input:not(:placeholder-shown) + i {
+    top: -10px;
+    font-size: 0.8rem;
+    color: #ccc;
+}
+
+.form .inputBox select + label {
+    top: -18px;
+    font-size: 0.9rem;
+    color: white;
+}
+
+.form button {
+    padding: 10px 15px;
+    background-color: white;
+    color: #045007;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-right: 10px;
+    transition: background-color 0.2s;
+}
+
+.form button:hover {
+background-color: #ddd;
+}
+
+/* formulaire liste */
+#invitees-hint {
+  font-size: 0.75rem;
+  color: #ccc;
+  margin-top: 5px;
+  display: none;
+}
+
+#invitees-input:focus ~ #invitees-hint {
+  display: block;
+}
+
+#invitees-suggestions {
+  list-style: none;
+  background-color: white;
+  color: #045007;
+  border: 1px solid #ccc;
+  max-height: 150px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  width: 100%;
+  z-index: 1000;
+  display: none;
+  border-radius: 5px;
+}
+
+#invitees-suggestions li {
+  padding: 8px;
+  cursor: pointer;
+}
+
+#invitees-suggestions li:hover {
+  background-color: #eee;
+}

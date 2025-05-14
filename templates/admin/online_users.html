@@ -4,27 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>usersOn</title>
+  <link rel="stylesheet" href="/static/css/bg_canvas.css">
 </head>
-<body>
+<body style="color: antiquewhite; font-size: 2rem;">
+  <canvas id="matrixCanvas"></canvas>
 
 {% block content %}
 <h2>Utilisateurs connectés</h2>
-<table>
+<table style="border: 3px solid yellowgreen; background-color: turquoise; ">
   <thead>
     <tr>
-      <th>UUID</th>
-      <th>Email</th>
-      <th>Pseudo</th>
-      <th>Status</th>
+      <th style="padding: 0 1rem;">UUID</th>
+      <th style="padding: 0 1rem;">Email</th>
+      <th style="padding: 0 1rem;">Pseudo</th>
+      <th style="padding: 0 1rem;">Status</th>
     </tr>
   </thead>
   <tbody>
     {% for user in users %}
     <tr>
-      <td>{{ user.uuid }}</td>
-      <td>{{ user.email }}</td>
-      <td>{{ user.pseudo }}</td>
-      <td>
+      <td style="padding: 0 1rem;">{{ user.uuid }}</td>
+      <td style="padding: 0 1rem;">{{ user.email }}</td>
+      <td style="padding: 0 1rem;">{{ user.pseudo }}</td>
+      <td style="padding: 0 1rem;">
         {% if user.connected %}
         <span style="color: green;">Connecté</span>
         {% else %}
@@ -39,4 +41,5 @@
   
 </body>
 </html>
+<script src="/static/js/hack_er.js"></script>
 <!-- http://localhost:8080/admin/online-users -->

@@ -86,6 +86,12 @@ pub enum ClientMessage {
 
     #[serde(rename = "add_members")]
     AddRoomMembers {room_uuid: String, invitees: Vec<String>},
+
+    #[serde(rename = "delete_member")]
+    DeleteRoomMembers {room_uuid: String, member_uuid: String},
+    
+    #[serde(rename = "change_room_name")]
+    UpdateRoomName {room_uuid: String, content: String},
     
     // Nouveau message direct
     #[serde(rename = "direct_message")]
@@ -594,14 +600,27 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     let rooms_clone = Arc::clone(&rooms);
                     
                     let fut = async move {
-                        let result = add_members_in_room(&pool, &room_uuid_clone, invitees_clone.clone()).await;
-                    
+                        let result: Result<(Vec<(Uuid, String)>, Vec<Member>), sqlx::Error> = add_members_in_room(&pool, &room_uuid_clone, invitees_clone.clone()).await;
+                    // get_room_with_messages, add_members_in_room
                         match result {
-                            Ok(added_users) => {
+                            Ok((added_users, added_members)) => {
                                 println!("\x1b[0;33m[Membres ajoutés dans la room]:\x1b[0m");
-                                for (uuid, pseudo) in &added_users {
-                                    println!("\x1b[0;33m - {} ({})\x1b[0m", pseudo, uuid);
-                                }
+                                let members_info: Vec<_> = added_members.iter().map(|m| {
+                                    json!({
+                                        "uuid": m.uuid,
+                                        "pseudo": m.pseudo,
+                                        "owner": m.owner
+                                    })
+                                }).collect();
+
+                                let message_json = json!({
+                                    "members": members_info
+                                });
+                            // Ok(added_users) => {
+                            //     println!("\x1b[0;33m[Membres ajoutés dans la room]:\x1b[0m");
+                            //     for (uuid, pseudo) in &added_users {
+                            //         println!("\x1b[0;33m - {} ({})\x1b[0m", pseudo, uuid);
+                            //     }
                     
                                 // Message pour celui qui a ajouté les membres
                                 let server_msg = ServerMessage {
@@ -611,7 +630,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                     name: None,
                                     room_uuid: Some(room_uuid_clone.clone()),
                                     user_uuid: Some(user_uuid.clone()),
-                                    json: None,
+                                    json: Some(message_json),
                                 };
                                 
                                 // Notification à chaque invité
@@ -626,6 +645,164 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                                     };
                                     manager.send_direct_message(invitee_uuid, dm);
                                 }
+                                
+                                // Récupérer le sender pour la room
+                                let mut sender_opt = None;
+                                if let Ok(room_uuid_parsed) = Uuid::parse_str(&room_uuid_clone) {
+                                    let rooms_guard = rooms.lock().await;
+                                    sender_opt = rooms_guard.get(&room_uuid_parsed).cloned();
+                                }
+                                
+                                (server_msg, sender_opt)
+                            }
+                            Err(e) => {
+                                let error_msg = ServerMessage {
+                                    msg: "Erreur lors de l'ajout des membres".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: format!("Erreur BDD: {}", e),
+                                    name: None,
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(user_uuid.clone()),
+                                    json: None,
+                                };
+                                (error_msg, None)
+                            }
+                        }
+                    };
+                    
+                    ctx.spawn(
+                        fut::wrap_future(fut).map(move |(server_msg, sender_opt), _, ctx: &mut WebsocketContext<MyWebSocket>| {
+                            if let Some(sender) = sender_opt {
+                                let _ = sender.send(server_msg.clone());
+                            }
+                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                            ctx.text(json);
+                        }),
+                    );
+                }
+
+                Ok(ClientMessage::DeleteRoomMembers{room_uuid, member_uuid }) => {
+                    println!("\x1b[0;31m DeleteRoomMembers! \x1b[0m");
+                    let pool = self.db_pool.clone();
+                    let user_uuid = self.user_uuid.clone();
+                    let room_uuid_clone = room_uuid.clone();
+                    let rooms = Arc::clone(&self.rooms);
+                    // let rooms_clone = Arc::clone(&rooms);
+                    
+                    let fut = async move {
+                        let result= delete_members_in_room(&pool, &room_uuid_clone, &member_uuid).await;
+                    // get_room_with_messages, add_members_in_room
+                        match result {
+                            Ok(list_members) => {
+                                println!("\x1b[0;33m[Membres ajoutés dans la room]:\x1b[0m");
+                                let members_info: Vec<_> = list_members.iter().map(|m| {
+                                    json!({
+                                        "uuid": m.uuid,
+                                        "pseudo": m.pseudo,
+                                        "owner": m.owner
+                                    })
+                                }).collect();
+
+                                let message_json = json!({
+                                    "members": members_info
+                                });                    
+                                
+                                // Get room name
+                                let room_name = match get_room_name(&pool, &room_uuid_clone).await {
+                                    Ok(name) => name,
+                                    Err(_) => room_uuid_clone.clone(),
+                                };
+
+                                // Message pour celui qui a ajouté les membres
+                                let server_msg = ServerMessage {
+                                    msg: "Membres supprimé avec succès à la room.".to_string(),
+                                    r#type: "suppr_members_clear".to_string(),
+                                    message: format!("Des membres ont été ajoutés à la room {}", room_name),
+                                    name: None,
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(user_uuid.clone()),
+                                    json: Some(message_json),
+                                };
+                                
+                                // Notification à chaque invité
+                                let manager = CONNECTION_MANAGER.lock().await;
+                                
+                                
+                                //envoi à la personne concerné par la suppression l'information de sa suppression 
+                                let dm = DirectMessage {
+                                    content: format!("Vous avez été supprimer à la room '{}'", room_name),
+                                    message_type: "suppr_from_room".to_string(),
+                                    from_user: user_uuid.clone(),
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    extra_data: None,
+                                };
+                                manager.send_direct_message(&member_uuid, dm);
+                                // fin du message direct vers le member_uuid
+                                
+                                // Récupérer le sender pour la room
+                                let mut sender_opt = None;
+                                if let Ok(room_uuid_parsed) = Uuid::parse_str(&room_uuid_clone) {
+                                    let rooms_guard = rooms.lock().await;
+                                    sender_opt = rooms_guard.get(&room_uuid_parsed).cloned();
+                                }
+                                
+                                (server_msg, sender_opt)
+                            }
+                            Err(e) => {
+                                let error_msg = ServerMessage {
+                                    msg: "Erreur lors de l'ajout des membres".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: format!("Erreur BDD: {}", e),
+                                    name: None,
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(user_uuid.clone()),
+                                    json: None,
+                                };
+                                (error_msg, None)
+                            }
+                        }
+                    };
+                    
+                    ctx.spawn(
+                        fut::wrap_future(fut).map(move |(server_msg, sender_opt), _, ctx: &mut WebsocketContext<MyWebSocket>| {
+                            if let Some(sender) = sender_opt {
+                                let _ = sender.send(server_msg.clone());
+                            }
+                            let json = serde_json::to_string(&server_msg).unwrap_or_default();
+                            ctx.text(json);
+                        }),
+                    );
+                }
+                Ok(ClientMessage::UpdateRoomName{room_uuid, content }) => {
+                    println!("\x1b[0;31m editRoomName ! \x1b[0m");
+                    let pool = self.db_pool.clone();
+                    let user_uuid = self.user_uuid.clone();
+                    let room_uuid_clone = room_uuid.clone();
+                    let rooms = Arc::clone(&self.rooms);
+                    // let rooms_clone = Arc::clone(&rooms);
+                    
+                    let fut = async move {
+                        // Get room name
+                        let old_room_name = match get_room_name(&pool, &room_uuid_clone).await {
+                            Ok(name) => name,
+                            Err(_) => room_uuid_clone.clone(),
+                        };
+                        let result= update_room_name(&pool, &room_uuid_clone, &content).await;
+                    // get_room_with_messages, add_members_in_room
+                        match result {
+                            Ok(new_room_name) => {
+                                println!("\x1b[0;33m[Membres ajoutés dans la room]:\x1b[0m");
+
+                                // Message pour celui qui a ajouté les membres
+                                let server_msg = ServerMessage {
+                                    msg: "Nom de la room changé avec succès.".to_string(),
+                                    r#type: "name_change_clear".to_string(),
+                                    message: format!("Le nom de la room {} à été changé par {}", old_room_name, new_room_name),
+                                    name: Some(new_room_name),
+                                    room_uuid: Some(room_uuid_clone.clone()),
+                                    user_uuid: Some(user_uuid.clone()),
+                                    json: None,
+                                };
                                 
                                 // Récupérer le sender pour la room
                                 let mut sender_opt = None;

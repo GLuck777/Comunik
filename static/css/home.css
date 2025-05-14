@@ -1,3 +1,26 @@
+.identity{
+  width: 55%;
+  font-size: 1.5rem;
+}
+.form_room{
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.open_room_modal{
+  background-color: #4f4e4e;
+  color: white;
+  font-size: 1.3rem;
+  padding: 0.55rem;
+  border-radius: 8px;
+  border: 2px solide transparent;
+}
+.open_room_modal:hover{
+  background-color: #656565;
+  border: 2px solide rgb(184, 59, 59);
+}
+
 
 .door_wrapper {
   position: absolute;
@@ -140,6 +163,9 @@ li.liste_collegue{
   border-right: 4px solid darkgray; /*pour tester*/
   border-top: 4px solid darkgray; /*pour tester*/
 }
+.CalliberPng{
+  width: 25px;
+}
 li.liste_collegue:hover{
   position: relative;
   top: 4px;
@@ -195,8 +221,13 @@ li.liste_collegue:hover{
   }
   
   .notifications ul li {
-    padding: 8px 0;
+    padding: 1rem 1rem 1rem 2rem;
     border-bottom: 1px solid #eee;
+    text-align: start;
+  }
+  .notifications ul li button.delNotif {
+    position: absolute;
+    right: 90%;
   }
 /* fin notification */
 
@@ -263,16 +294,17 @@ li.liste_collegue:hover{
   color: white;
   border-radius: 8px;
   gap: 0.5rem;
+  padding: 1rem 2rem;
 }
-#create-room-form {
+#create_room_form {
   display: flex;
   flex-direction: column;
   align-items: center;
   word-break: break-word;
-  width: 15vw;
+  /* width: 15vw; */
   text-align: center;
 }
-#create-room-form button[type="submit"] {
+#create_room_form button[type="submit"] {
   background-color: #011502;
   color: white;
   font-size: large;
@@ -281,7 +313,7 @@ li.liste_collegue:hover{
   border-radius: 8px;
   width: 60%;
 }
-#create-room-form button#close-room-modal{
+#create_room_form button#close-room-modal{
   background-color: #e73701;
   color: white;
   font-size: large;
@@ -290,6 +322,9 @@ li.liste_collegue:hover{
   border-radius: 8px;
   width: 60%;
 }
+/* .modal_add_room{
+  padding: 1rem 2rem;
+} */
 
 
 .disp_flex{

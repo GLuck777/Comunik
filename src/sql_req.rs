@@ -1,4 +1,4 @@
-use sqlx::{SqlitePool, Row, FromRow, Error};
+use sqlx::{Error, FromRow, Result, Row, SqlitePool};
 use uuid::Uuid;
 use serde::Serialize;
 use chrono::NaiveDateTime;
@@ -20,6 +20,7 @@ pub async fn create_room_in_db(
     let result = sqlx::query("INSERT INTO rooms (room_uuid, name, owner_uuid) VALUES (?, ?, ?)")
         .bind(&room_uuid)
         .bind(name)
+        // .bind(visibility.to_string()) visibility, ?,
         .bind(owner_uuid)
         .execute(pool)
         .await;
@@ -176,6 +177,7 @@ where
 pub struct Member {
     pub uuid: String,
     pub pseudo: String,
+    pub owner: bool,
 }
 
 pub async fn get_room_with_messages(
@@ -232,7 +234,7 @@ pub async fn get_room_with_messages(
     };
     // Récupération des UUIDs des membres de la room
     let member_rows = sqlx::query(
-        "SELECT user_uuid FROM room_members WHERE room_uuid = ?")
+        "SELECT user_uuid, role FROM room_members WHERE room_uuid = ?")
     .bind(room_uuid)
     .fetch_all(pool)
     .await;
@@ -243,12 +245,14 @@ pub async fn get_room_with_messages(
             for row in rows {
                 // Extraire le user_uuid depuis la ligne
                 let user_uuid: String = row.try_get("user_uuid").unwrap_or_default();
+                let role_user: String = row.try_get("role").unwrap_or_default();
 
                 // Appel à ta fonction pour récupérer le pseudo
                 if let Ok(pseudo) = get_user_name(pool, &user_uuid).await {
                     members.push(Member {
                         uuid: user_uuid,
                         pseudo,
+                        owner: role_user == "owner",
                     });
                 }
             }
@@ -268,7 +272,8 @@ pub async fn add_members_in_room(
     invitees: Vec<String>
 // ) -> Result<Vec<String>, sqlx::Error> {
 // ) -> Result<Vec<Uuid>, sqlx::Error>{
-) -> Result<Vec<(Uuid, String)>, sqlx::Error>{
+// ) -> Result<Vec<(Uuid, String)>, sqlx::Error>{
+) -> Result<(Vec<(Uuid, std::string::String)>, Vec<Member>), sqlx::Error>{
     
     println!("\x1b[0;31m add_members_in_room! \x1b[0m");
     println!("liste invite: {:?}",invitees);
@@ -345,9 +350,9 @@ pub async fn add_members_in_room(
     // Envoyer les notifications
     for receiver_uuid in all_receivers {
         let message = if new_invited_uuids.contains(&receiver_uuid) {
-            format!("Salut ! Tu as été ajouté(e) à la room '{}' par {} 🎉", room.name, name_user)
+            format!("Salut ! Vous avez été ajouté(e) à la room '{}' par {} 🎉", room.name, name_user)
         } else {
-            format!("{} a invité de nouveaux membres dans la room '{}'.", name_user, room.name)
+            format!("{} a invité de nouveaux membres dans la room '{}'.", name_user, room.name) // A faire plus tard personalisation pour chaque nouveaux membres
         };
 
         sqlx::query(
@@ -358,18 +363,89 @@ pub async fn add_members_in_room(
             .await?;
     }
 
-    let user_uuids = sqlx::query_scalar::<_, String>(
-        "SELECT user_uuid FROM room_members WHERE room_uuid = ?")
-        .bind(room_uuid)
-        .fetch_all(pool)
-        .await?;
+    
+    // Récupération des UUIDs des membres de la room
+    let member_rows = sqlx::query(
+        "SELECT user_uuid, role FROM room_members WHERE room_uuid = ?")
+    .bind(room_uuid)
+    .fetch_all(pool)
+    .await;
+    
+    let mut members = Vec::new();
+    match member_rows {
+        Ok(rows) => {
+            for row in rows {
+                // Extraire le user_uuid depuis la ligne
+                let user_uuid: String = row.try_get("user_uuid").unwrap_or_default();
+                let role_user: String = row.try_get("role").unwrap_or_default();
 
+                // Appel à ta fonction pour récupérer le pseudo
+                if let Ok(pseudo) = get_user_name(pool, &user_uuid).await {
+                    members.push(Member {
+                        uuid: user_uuid,
+                        pseudo,
+                        owner: role_user == "owner",
+                    });
+                }
+            }
+        },
+        Err(e) => {
+            println!("Erreur lors de la récupération des membres de la room: {:?}", e);
+            return Err(e);
+        }
+    }
 
     // Ok(user_uuids)
     // Invitees est une liste de String/UUID
-    Ok(added_users)
+    // Ok(added_users)
+     Ok((added_users, members))
 }
 
+pub async fn delete_members_in_room(
+    pool: &SqlitePool,
+    room_uuid: &str,
+    member_uuid: &str,
+) -> Result<Vec<Member>, sqlx::Error>{
+    // let delete_roomMember = 
+    sqlx::query(
+        "DELETE FROM room_members WHERE room_uuid = ? AND user_uuid = ?")
+        .bind(room_uuid.to_string())
+        .bind(member_uuid.to_string())
+        .execute(pool).
+        await?;
+
+    // Récupération des UUIDs des membres de la room
+    let member_rows = sqlx::query(
+        "SELECT user_uuid, role FROM room_members WHERE room_uuid = ?")
+        .bind(room_uuid)
+        .fetch_all(pool)
+        .await;
+
+    let mut members = Vec::new();
+    match member_rows {
+        Ok(rows) => {
+            for row in rows {
+                // Extraire le user_uuid depuis la ligne
+                let user_uuid: String = row.try_get("user_uuid").unwrap_or_default();
+                let role_user: String = row.try_get("role").unwrap_or_default();
+
+                // Appel à ta fonction pour récupérer le pseudo
+                if let Ok(pseudo) = get_user_name(pool, &user_uuid).await {
+                    members.push(Member {
+                        uuid: user_uuid,
+                        pseudo,
+                        owner: role_user == "owner",
+                    });
+                }
+            }
+        },
+        Err(e) => {
+            println!("Erreur lors de la récupération des membres de la room: {:?}", e);
+            return Err(e);
+        }
+    };
+    Ok(members)
+}
 
 
 // Verifie si l'utilisateur appartient à la room
@@ -438,6 +514,43 @@ pub async fn get_user_name(pool: &sqlx::SqlitePool, user_uuid: &str) -> Result<S
 
     // println!("============> pseudo true or false: {}", pseudo.0);
     Ok(pseudo.0)
+}
+pub async fn get_room_name(pool: &sqlx::SqlitePool, room_uuid: &str) -> Result<String, sqlx::Error>  {
+    // println!("get_user_name is_user_in_room ?");
+    let room_name: (String,) = sqlx::query_as(
+        "SELECT name FROM rooms WHERE room_uuid = ?"
+    )
+    .bind(room_uuid)
+    .fetch_one(pool)
+    .await?;
+    // if let Err(e) = room_name {
+    //     println!(
+    //         "Erreur lors de l'insertion du message pour {}: {:?}",
+    //         room_uuid, e
+    //     );
+    // }
+
+    // println!("============> pseudo true or false: {}", pseudo.0);
+    Ok(room_name.0)
+}
+
+pub async fn update_room_name(pool: &sqlx::SqlitePool, room_uuid: &str, content: &str) -> Result<String, sqlx::Error>  {
+    let change_room_name = sqlx::query(
+        "UPDATE rooms SET name = ? WHERE room_uuid = ?"
+    )
+    .bind(content)
+    .bind(room_uuid)
+    .execute(pool)
+    .await; //?
+
+    if let Err(e) = change_room_name {
+        println!(
+            "Erreur lors de l'insertion du message pour {}: {:?}",
+            room_uuid, e
+        );
+    }
+
+    Ok(content.to_string())
 }
 
 // Function to get all active rooms from database
