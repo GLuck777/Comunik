@@ -86,6 +86,15 @@ struct Rooms {
     member_count: i64,  // Nombre de membres dans la salle
 }
 
+#[derive(Serialize, FromRow, Debug)]
+struct RoomWithMembers {
+    uuid: String,
+    name: String,
+    owner_uuid: String,
+    created_at: String,
+    content: Vec<String>, // pseudos des membres
+}
+
 //if let Ok(Some(_)) = session.get::<String>("uuid") { // restriction sur la possibilité de l'utilisateur 
 
 pub async fn access_form(session: Session) -> impl Responder {
@@ -503,6 +512,69 @@ pub async fn get_user_notifications(
             Ok(HttpResponse::InternalServerError().finish())  // Retourner une erreur 500 si la requête échoue
         }
     }
+}
+#[derive(Serialize, FromRow, Debug)]
+struct RoomRow {
+    room_uuid: String,
+    name: String,
+    owner_uuid: String,
+    created_at: String,
+}
+
+#[derive(Serialize, FromRow, Debug)]
+struct MemberRow {
+    user_uuid: String,
+}
+// recupère sur une page web des informations concernant les rooms d'un user
+pub async fn get_user_rooms(
+    pool: web::Data<SqlitePool>,
+    user_uuid: web::Path<String>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user_uuid = user_uuid.into_inner();
+
+    // Étape 1 : récupérer les rooms où est l'utilisateur
+    let rooms = sqlx::query_as::<_, RoomRow>(
+        "
+        SELECT r.room_uuid, r.name, r.owner_uuid, r.created_at
+        FROM rooms r
+        INNER JOIN room_members rm ON rm.room_uuid = r.room_uuid
+        WHERE rm.user_uuid = ?
+        ORDER BY r.created_at DESC
+        ")
+    .bind(user_uuid)
+    .fetch_all(pool.get_ref())
+    .await.map_err(actix_web::error::ErrorInternalServerError)?;
+
+    let mut result = Vec::new();
+
+    // Étape 2 : pour chaque room, récupérer les UUID des membres puis appeler `get_user_name` pour chaque
+    for room in rooms {
+        let room_uuid = &room.room_uuid;
+        let member_uuids = sqlx::query_as::<_, MemberRow>(
+        "SELECT user_uuid FROM room_members WHERE room_uuid = ?"
+        )
+        .bind(room_uuid)
+        .fetch_all(pool.get_ref())
+        .await.map_err(actix_web::error::ErrorInternalServerError)?;
+
+        let mut member_pseudos = Vec::new();
+        for record in member_uuids {
+            if let Ok(pseudo) = get_user_name(pool.get_ref(), &record.user_uuid).await {
+                member_pseudos.push(pseudo);
+            }
+        }
+
+
+        result.push(RoomWithMembers {
+            uuid: room.room_uuid,
+            name: room.name,
+            owner_uuid: room.owner_uuid,
+            created_at: room.created_at.to_string(),
+            content: member_pseudos,
+        });
+    }
+
+    Ok(HttpResponse::Ok().json(result))
 }
 
 // GET /api/notifications/:user_uuid

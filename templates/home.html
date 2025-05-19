@@ -279,6 +279,7 @@
     return socket;
   }
 
+  // En selectionnant une room on recupère les informations liées à la room 
   async function openRoom(roomUuid) {
     if (!roomUuid) {
       console.error("Room UUID is undefined or empty");
@@ -598,8 +599,8 @@
         displayNotifications(notifications);
 
         // ajouter la room à la liste des rooms disponibles
-        // /api/rooms/{user_uuid}
-        const resRooms = await fetch(`/api/rooms/${parsed.room_uuid}`);
+        // /api/room/{user_uuid}
+        const resRooms = await fetch(`/api/room/${parsed.room_uuid}`);
         const list_R = await resRooms.json();
         roomsContainer_filler(list_R);
         break;
@@ -940,7 +941,7 @@
     displayAllNotifs()
   }
   
-  // fonctionne bien 
+  // fonctionne bien appel une fonction dans handlers.rs -> get_user_notifications
   async function displayAllNotifs(){
     // let user_uuid = document.getElementById("uuid").value;
     // console.log("get_user_notifications, nouveaux notifs + uuid", user_uuid)
@@ -948,6 +949,54 @@
       const notifications = await resu.json();
       // console.log("notifs: \n",notifications)
       displayNotifications(notifications);
+  }
+  // === Rooms ===
+  function displayRooms(rooms){
+    // <aside class="list_room">
+    // <h2>Rooms disponibles :</h2>
+    // <div class="rooms_container" id="rooms_container">
+    let container_room = document.getElementById("rooms_container");
+    container_room.textContent = "";
+
+    rooms.forEach((room) => {
+      let div_room = document.createElement("div")
+      div_room.className = "room_card";
+      // <div class="room_card" onclick="openRoom('room.room_uuid')">
+      div_room.onclick = () => openRoom(room.uuid);
+      // <h3>room.name</h3>
+      let h3_room = document.createElement("h3");
+      h3_room.textContent = room.name;
+
+      div_room.appendChild(h3_room)
+
+      // ajout des membres
+      // <p><strong>Membres:</strong> room.member_count</p>
+      let p_room = document.createElement("p");
+      let strong_room = document.createElement("strong");
+      strong_room.textContent = "Membres: ";
+
+      p_room.appendChild(strong_room);
+
+      room.content.forEach((member) => {
+        let span = document.createElement("span");
+        span.textContent = member + " ";
+        p_room.appendChild(span);
+      });
+
+      div_room.appendChild(p_room);
+      container_room.appendChild(div_room);
+
+      
+    });
+  }
+  // fonctionne bien appel une fonction dans handlers.rs -> get_user_notifications
+  async function displayAllRooms(){
+    // let user_uuid = document.getElementById("uuid").value;
+    // console.log("get_user_notifications, nouveaux notifs + uuid", user_uuid)
+    const resu = await fetch(`/api/rooms/${current_user_uuid}`);
+      const rooms = await resu.json();
+      console.log("rooms: \n",rooms)
+      displayRooms(rooms);
   }
 
   // === Modale création room ===
@@ -1019,6 +1068,7 @@
     if (typeof displayAllNotifs === 'function') displayAllNotifs();
     //debut pour travailler sur les utilisateurs EN TRAVAUX
     if (typeof fetch_users === 'function') fetch_users();
+    if (typeof displayAllRooms === 'function') displayAllRooms();
 
     // bloc de suggestion invité for room creation for smooth search
     // const input = document.getElementById('invitees_input');
