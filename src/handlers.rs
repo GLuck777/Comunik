@@ -513,6 +513,33 @@ pub async fn get_user_notifications(
         }
     }
 }
+
+use std::collections::HashMap;
+#[derive(Serialize, FromRow, Debug)]
+
+struct UserRow{
+    pseudo: String,
+    uuid: String,
+}
+//search_member
+// #[get("/api/search_users")]
+pub async fn search_users(
+    pool: web::Data<SqlitePool>,
+    query: web::Query<HashMap<String, String>>,
+) -> impl Responder {
+    let search = query.get("query").unwrap_or(&"".to_string()).to_lowercase();
+
+    let users = sqlx::query_as::<_ , UserRow>(
+        // struct qui contient au minimum `pseudo` et `uuid`
+        "SELECT pseudo, uuid FROM users WHERE LOWER(pseudo) LIKE ? LIMIT 10",
+    )
+    .bind(format!("%{}%", search))
+    .fetch_all(pool.get_ref())
+    .await
+    .unwrap_or_else(|_| vec![]);
+
+    HttpResponse::Ok().json(users)
+}
 #[derive(Serialize, FromRow, Debug)]
 struct RoomRow {
     room_uuid: String,

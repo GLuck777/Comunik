@@ -146,6 +146,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/api/room/{user_uuid}").route(web::get().to(get_room_by_uuid)))
             .service(web::resource("/api/rooms/{user_uuid}").route(web::get().to(get_user_rooms)))
             .service(web::resource("/api/notif/{user_uuid}").route(web::get().to(get_user_notifications))) // in use
+            .service(web::resource("/api/search_users").route(web::get().to(search_users))) // in use
             .service(web::resource("/api/notifications/{user_uuid}").route(web::get().to(get_notifications)))
             .service(web::resource("/api/notificationsD/{id}").route(web::delete().to(delete_notification)))
             .service(web::resource("/ws/").route(web::get().to(websocket_handler)))

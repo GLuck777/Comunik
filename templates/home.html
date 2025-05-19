@@ -98,17 +98,25 @@
     <!-- Onglet de recherche -->
     <div id="search_tab" style="display: none;">
       <div class="search_users">
-        <div class="flex items-center">
-          <input type="text" placeholder="Search users..." 
-          class="w-64 px-4 py-2 rounded-lg text-gray-900 border border-transparent focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent" value="ghfhf">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
-            class="lucide lucide-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.3-4.3"></path>
-          </svg>
-        </div>
-        <div id="list_user" class="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg overflow-hidden z-50">
-          <div class="p-4 text-gray-500 text-center">No more users found</div>
+        <!-- Zone de recherche -->
+        <div class="left_search">
+          <h3>Recherche de membres</h3>
+          <div class="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" 
+              class="">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.3-4.3"></path>
+            </svg>
+            <input type="text" placeholder="Search users..." 
+            class="search_bar" value="a">
+            
+          </div>
+          <datalist id="user_list"></datalist>
+          <div id="list_user" class="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg overflow-hidden z-50"></div>
+        </div> <!-- fin zone de recherche-->
+        <!-- Zone de liste amis -->
+        <div class="right_search">
+          <h3>Liste des membres affiliés</h3>
         </div>
       </div>
     </div>
@@ -698,35 +706,51 @@
   }
   //systeme d'affichage temporaire
   function displayTempListUser(json){
-    // pour la prochaine verification en bac avant le fetch si l'user est deja follow, son statut...
-    // prochaine maj ajouter accès au profile utilisateur (si utile)
-    let list_user = document.getElementById('list_user');
-    let datalist = document.getElementById('user_list');
-    datalist.innerHTML = ""; // Clear previous options
+    const list_user = document.getElementById('list_user');
+    const datalist = document.getElementById('user_list');
+
+    datalist.innerHTML = ""; // Clear datalist options
+    list_user.innerHTML = ""; // Clear previous displayed user cards
     liste_utilisateurs = [];
 
+    console.log("json", json, json.length)
+    if (json.length === 0) {
+        list_user.style.display = 'none';
+        return;
+    }
+
+    list_user.style.display = 'block';
+
     json.forEach(element => {
-      liste_utilisateurs.push({ pseudo: element.pseudo, uuid: element.uuid });
+        liste_utilisateurs.push({ pseudo: element.pseudo, uuid: element.uuid });
 
-      let option = document.createElement("option");
-      option.value = element.pseudo;
-      datalist.appendChild(option);
+        let option = document.createElement("option");
+        option.value = element.pseudo;
+        datalist.appendChild(option);
 
-      let btnDispatch = document.createElement("button");
-      btnDispatch.textContent = " Suivre ?";
-      let divDispatch = document.createElement("div");
-      divDispatch.className = "card_users";
-      divDispatch.id = element.uuid;
-      // divDispatch.textContent = element.pseudo;
-      let aDispatch = document.createElement("a")
-      aDispatch.textContent = element.pseudo;
-      aDispatch.href = "/profile/"+element.uuid;
-      aDispatch.target = "_blanc"
-      divDispatch.appendChild(aDispatch);
-      divDispatch.appendChild(btnDispatch);
-      list_user.appendChild(divDispatch);
+        let btnDispatch = document.createElement("button");
+        btnDispatch.textContent = "Suivre ?";
+        btnDispatch.onclick = () => demandeAmis(element.uuid);
+        let divDispatch = document.createElement("div");
+        divDispatch.className = "card_users";
+        divDispatch.id = element.uuid;
+
+        let aDispatch = document.createElement("a");
+        aDispatch.textContent = element.pseudo;
+        aDispatch.href = "/profile/" + element.uuid;
+        aDispatch.target = "_blank";
+
+        divDispatch.appendChild(aDispatch);
+        divDispatch.appendChild(btnDispatch);
+        list_user.appendChild(divDispatch);
     });
-    
+  }
+
+  function demandeAmis(uuid){
+    console.log("uuid", uuid)
+    // faire le fetch dans le back pour faire la demande d'amis 
+    // suivre ? -> verification si tu l'as deja follow par un unfollow
+    // dans la liste d'amis (function pas encore faite) faire un bouton unfollow egalement
   }
   //reception de tous les messages entrant pour une room
   function displayRoomMessages(messages) {
@@ -1169,13 +1193,21 @@
     initInviteeSuggestions('new_inv', 'new_inv_suggestions');
 
 
-    // Cacher suggestions si on clique ailleurs
-    // document.addEventListener('click', function (e) {
-    //   if (!input.contains(e.target) && !suggestionBox.contains(e.target)) {
-    //     suggestionBox.style.display = 'none';
-    //   }
-    // });
-    // fin de bloc de suggestion invité for room creation
+    // search bar pour rechercher membres
+    document.querySelector('.left_search input').addEventListener('input', function() {
+      const search = this.value.trim();
+      console.log("search: ", search);
+
+      if (search.length > 0) {
+        // fetch ton endpoint ici, par exemple :
+        fetch(`/api/search_users?query=${encodeURIComponent(search)}`)
+          .then(res => res.json())
+          .then(json => displayTempListUser(json));
+      } else {
+        document.getElementById('list_user').style.display = 'none';
+      }
+    });
+    // fin search bar pour rechercher membres
 
     
     // REDIRECTION PATH

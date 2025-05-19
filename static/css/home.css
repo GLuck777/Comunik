@@ -442,8 +442,81 @@ li.liste_collegue:hover{
 }
 
 /* section search user */
-.search_users{
+/* .search_users{
   height: 70vh;
   padding: 1rem;
+} */
+#search_tab {
+  display: none;
+}
+
+.search_users {
+  height: 70vh;
+  display: flex;
+  gap: 2rem;
+  padding: 1rem;
+}
+
+.left_search, .right_search {
+  flex: 1;
+}
+
+#list_user {
+  display: none; /* caché par défaut */
+  /* position: absolute; */
+  /* top: 100%; */
+  /* left: 0; */
+  /* right: 0; */
+  margin-top: 0.5rem;
+  /* background: white; */
+  background-color: #011502;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  z-index: 50;
+}
+.search_bar {
+  padding: 0.6rem;
+  border-radius: 15px;
+  border: none;
+}
+
+.card_users {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card_users a {
+  color: white;
+  text-decoration: none;
+  font-size: 1.2rem;
+}
+
+.card_users:last-child {
+  border-bottom: none;
+}
+
+.card_users button {
+  background-color: #3b82f6; /* bleu Tailwind 'blue-500' */
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  margin-left: 1rem;
+  border-radius: 0.375rem; /* arrondi Tailwind 'rounded-md' */
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.card_users button:hover {
+  background-color: #2563eb; /* bleu un peu plus foncé 'blue-600' */
+  transform: scale(1.05);
+}
+
+.card_users button:active {
+  background-color: #1d4ed8; /* 'blue-700' */
+  transform: scale(0.98);
 }
 
