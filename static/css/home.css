@@ -473,7 +473,40 @@ li.liste_collegue:hover{
 .btn_following{
   background-color: #cacaca;
 }
+.btn_accept, .btn_decline{
+  padding: 0.6rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+/* liste des membres affiliés */
+#list_demand{
+  display: flex;
+  gap: 0.5rem;
+}
+.friend_request_card{
+  width: 100%;
+  padding: 0.5rem;
+  background: #7fffd459;
+  border-radius: 20px;
+  margin-top: 0.8rem;
+}
+/* div qui contient les deux boutons pour repondre à la demande */
+.conteneur_btn{
+  width: fit-content;
+  position: relative;
+  float: right;
+}
 
+.btn_accept{
+  background: rgb(17, 125, 219);
+  color: #dddddd;
+  margin-right: 0.5rem;
+}
+.btn_decline{
+  background: rgb(204, 36, 6);
+  color: #dddddd;
+}
 .left_search, .right_search {
   flex: 1;
   padding: 1rem 2rem;

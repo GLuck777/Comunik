@@ -1035,6 +1035,20 @@
       // console.log("notifs: \n",notifications)
       displayNotifications(notifications);
   }
+  function getTimeAgo(dateString) {
+    const now = new Date();
+    const created = new Date(dateString.replace(" ", "T")); // compatibilité ISO
+
+    const seconds = Math.floor((now - created) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return `il y a ${seconds} secondes`;
+    if (minutes < 60) return `il y a ${minutes} minutes`;
+    if (hours < 24) return `il y a ${hours} heures`;
+    return `il y a ${days} jours`;
+  }
   // === Rooms ===
   function displayRooms(rooms){
     // <aside class="list_room">
@@ -1074,6 +1088,58 @@
       
     });
   }
+  
+  // === Friend Request ===
+  function displayResquest(requests){
+    request_list = document.getElementById("list_demand")
+    request_list.innerHTML = ""; // Vider l'ancien contenu
+
+    requests.forEach(req => {
+      const { sender_uuid, sender_pseudo, created_at } = req;
+
+      // Calcul du temps écoulé
+      const timeAgo = getTimeAgo(created_at);
+
+      // Création du conteneur de la demande
+      const requestDiv = document.createElement("div");
+      requestDiv.className = "friend_request_card";
+
+      // Lien vers le profil
+      const profileLink = document.createElement("a");
+      profileLink.href = `/profile/${sender_uuid}`;
+      profileLink.textContent = sender_pseudo + " veut se lier à vous.";
+      profileLink.target = "_blank";
+      profileLink.style.color = "white";
+
+      // Texte de date
+      const timeText = document.createElement("p");
+      timeText.textContent = `Envoyé ${timeAgo}`;
+
+      const conteneurbtn = document.createElement("div");
+      conteneurbtn.className = "conteneur_btn"
+      // Boutons (facultatif : à adapter selon ce que tu veux faire)
+      const acceptBtn = document.createElement("button");
+      acceptBtn.className = "btn_accept"
+      acceptBtn.textContent = "Accepter";
+      acceptBtn.onclick = () => acceptFriend(sender_uuid); // à définir ailleurs
+
+      const declineBtn = document.createElement("button");
+      declineBtn.className = "btn_decline"
+      declineBtn.textContent = "Refuser";
+      declineBtn.onclick = () => declineFriend(sender_uuid); // à définir ailleurs
+
+      // Ajout des éléments dans la carte
+      requestDiv.appendChild(profileLink);
+      requestDiv.appendChild(timeText);
+      
+      conteneurbtn.appendChild(acceptBtn);
+      conteneurbtn.appendChild(declineBtn);
+      requestDiv.appendChild(conteneurbtn);
+
+      request_list.appendChild(requestDiv);
+    });
+  }
+  
   // fonctionne bien appel une fonction dans handlers.rs -> get_user_notifications
   async function displayAllRooms(){
     // let user_uuid = document.getElementById("uuid").value;
@@ -1087,7 +1153,7 @@
     const resu = await fetch(`/api/demand/${current_user_uuid}`);
       const requests = await resu.json();
       console.log("rooms ULTIMEFLASH: \n",requests)
-      // displayResquest(requests);
+      displayResquest(requests);
   }
 
   // === Modale création room ===
