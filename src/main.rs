@@ -58,6 +58,7 @@ pub async fn websocket_handler(
             user_uuid: uuid,
             room_uuid,
             rooms: Arc::clone(&app_state.rooms),
+            app_state: app_state, //.clone()
         };
         println!("\x1b[0;31m Start! \x1b[0m");
         other_ws::start(ws, &req, stream)
@@ -146,6 +147,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/api/room/{user_uuid}").route(web::get().to(get_room_by_uuid)))
             .service(web::resource("/api/rooms/{user_uuid}").route(web::get().to(get_user_rooms)))
             .service(web::resource("/api/notif/{user_uuid}").route(web::get().to(get_user_notifications))) // in use
+            .service(web::resource("/api/demand/{user_uuid}").route(web::get().to(get_friend_request))) // in use
             .service(web::resource("/api/search_users").route(web::get().to(search_users))) // in use
             .service(web::resource("/api/notifications/{user_uuid}").route(web::get().to(get_notifications)))
             .service(web::resource("/api/notificationsD/{id}").route(web::delete().to(delete_notification)))

@@ -6,7 +6,7 @@ use actix_session::Session;
 use serde::{Serialize, Deserialize};
 use tera::Context;
 use uuid::Uuid;
-use sqlx::{SqlitePool, Row, FromRow};
+use sqlx::{pool, FromRow, Row, SqlitePool};
 use rand::{Rng, distributions::Alphanumeric};
 use argon2::{Argon2, PasswordHasher, PasswordVerifier, PasswordHash as PH};
 use password_hash::{SaltString, PasswordHash, rand_core::OsRng};
@@ -521,25 +521,102 @@ struct UserRow{
     pseudo: String,
     uuid: String,
 }
+#[derive(Serialize)]
+struct UserResult {
+    pseudo: String,
+    uuid: String,
+    status: String, // "following", "pending", "not_following"
+}
+
 //search_member
 // #[get("/api/search_users")]
+// pub async fn search_users(
+//     pool: web::Data<SqlitePool>,
+//     query: web::Query<HashMap<String, String>>,
+// ) -> impl Responder {
+//     // ajout verification true/false cette personne t'a deja envoyer une demande d'amis ou non, tu l'as deja suivi ou non
+//     let search = query.get("query").unwrap_or(&"".to_string()).to_lowercase();
+
+//     let users = sqlx::query_as::<_ , UserRow>(
+//         // struct qui contient au minimum `pseudo` et `uuid`
+//         "SELECT pseudo, uuid FROM users WHERE LOWER(pseudo) LIKE ? LIMIT 10",
+//     )
+//     .bind(format!("%{}%", search))
+//     .fetch_all(pool.get_ref())
+//     .await
+//     .unwrap_or_else(|_| vec![]);
+
+//     HttpResponse::Ok().json(users)
+// }
+
 pub async fn search_users(
     pool: web::Data<SqlitePool>,
     query: web::Query<HashMap<String, String>>,
+    session: Session,
 ) -> impl Responder {
     let search = query.get("query").unwrap_or(&"".to_string()).to_lowercase();
 
-    let users = sqlx::query_as::<_ , UserRow>(
-        // struct qui contient au minimum `pseudo` et `uuid`
-        "SELECT pseudo, uuid FROM users WHERE LOWER(pseudo) LIKE ? LIMIT 10",
+    // Récupérer le user_uuid de la session
+    let Some(current_user_uuid) = session.get::<String>("uuid").unwrap_or(None) else {
+        return HttpResponse::Unauthorized().body("Utilisateur non connecté");
+    };
+
+    // Recherche des utilisateurs
+    let users = sqlx::query_as::<_, UserRow>(
+        "SELECT pseudo, uuid FROM users WHERE LOWER(pseudo) LIKE ? AND uuid != ? LIMIT 10"
     )
     .bind(format!("%{}%", search))
+    .bind(&current_user_uuid)
     .fetch_all(pool.get_ref())
     .await
     .unwrap_or_else(|_| vec![]);
 
-    HttpResponse::Ok().json(users)
+    let mut results = Vec::new();
+
+    for user in users {
+        let target_uuid = &user.uuid;
+
+        // Vérifie si une demande d'ami existe (en attente)
+        let pending = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM friend_requests WHERE sender_uuid = ? AND receiver_uuid = ?"
+        )
+        .bind(&current_user_uuid)
+        .bind(&target_uuid)
+        .fetch_one(pool.get_ref())
+        .await
+        .unwrap_or(0) > 0;
+
+        // Vérifie si déjà amis
+        let friends = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM friendships 
+             WHERE (user1_uuid = ? AND user2_uuid = ?) OR (user1_uuid = ? AND user2_uuid = ?)"
+        )
+        .bind(&current_user_uuid)
+        .bind(&target_uuid)
+        .bind(&target_uuid)
+        .bind(&current_user_uuid)
+        .fetch_one(pool.get_ref())
+        .await
+        .unwrap_or(0) > 0;
+
+        let status = if friends {
+            "following"
+        } else if pending {
+            "pending"
+        } else {
+            "not_following"
+        };
+
+        results.push(UserResult {
+            pseudo: user.pseudo,
+            uuid: user.uuid,
+            status: status.to_string(),
+        });
+    }
+
+    HttpResponse::Ok().json(results)
 }
+
 #[derive(Serialize, FromRow, Debug)]
 struct RoomRow {
     room_uuid: String,
@@ -604,6 +681,53 @@ pub async fn get_user_rooms(
     Ok(HttpResponse::Ok().json(result))
 }
 
+#[derive(Debug, Serialize)]
+struct FriendRequestInfo {
+    sender_uuid: String,
+    sender_pseudo: String,
+    created_at: String,
+}
+
+pub async fn get_friend_request(
+    pool: web::Data<SqlitePool>,
+    user_uuid: web::Path<String>
+) -> Result<HttpResponse, actix_web::Error> {
+    println!("\x1b[0;31m je suis sur get_friend_request! \x1b[0m");
+
+    let user_uuid = user_uuid.into_inner();
+    // Récupère toutes les requêtes où `receiver_uuid` est le user
+    let requests = sqlx::query(
+        "SELECT sender_uuid, created_at FROM friend_requests WHERE receiver_uuid = ? AND status = 'pending'")
+    .bind(&user_uuid)
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    let mut results = Vec::new();
+
+    for row in requests {
+        let sender_uuid: String = row.try_get("sender_uuid").unwrap_or_default();
+        let created_at: String = row.try_get::<String, _>("created_at").unwrap_or_else(|_| "unknown".to_string());
+
+        // Récupérer le pseudo via ta fonction
+        let sender_pseudo = match get_user_name(pool.get_ref(), &sender_uuid).await {
+            Ok(name) => name,
+            Err(_) => continue,
+        };
+
+        let request_info = FriendRequestInfo {
+            sender_uuid,
+            sender_pseudo,
+            created_at,
+        };
+        results.push(request_info);
+        // Affichage après chaque insertion
+        println!("\x1b[0;31m request friends {:?} \x1b[0m", results);
+    }
+
+    println!("\x1b[0;31m {:?} \x1b[0m", results);
+    Ok(HttpResponse::Ok().json(results))
+}
 // GET /api/notifications/:user_uuid
 pub async fn get_notifications(
     pool: web::Data<SqlitePool>,

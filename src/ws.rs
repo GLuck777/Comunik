@@ -81,6 +81,9 @@ pub enum ClientMessage {
     #[serde(rename = "join_room")]
     GetRoomData { room_uuid: String },
 
+    #[serde(rename = "ask_friend")]
+    AskFriendRequest { receiver_uuid: String },
+
     #[serde(rename = "fetch_users")]
     GetUsersData {},
 
@@ -148,13 +151,15 @@ pub struct ServerMessage {
 // }
 
 
-
+use actix_web::web;
+use crate::AppState;
 #[derive(Debug)]
 pub struct MyWebSocket {
     pub db_pool: SqlitePool,
     pub user_uuid: String,
     pub room_uuid: Option<String>,
     pub rooms: Arc<Mutex<HashMap<Uuid, broadcast::Sender<ServerMessage>>>>,
+    pub app_state: web::Data<AppState>,
 }
 
 impl Actor for MyWebSocket {
@@ -398,6 +403,73 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     );
                 }
                 
+                Ok(ClientMessage::AskFriendRequest { receiver_uuid }) => {
+                    println!("Demande d'ami envoyée à {:?}", receiver_uuid);
+
+                    // let sender_uuid = &self.user_uuid;
+                    let sender_uuid = self.user_uuid.clone(); // ✅ valeur propre, move-safe
+
+
+                    let pool = self.db_pool.clone();
+                    
+                    let receiver_uuid_clone = receiver_uuid.clone();
+                    let app_state = self.app_state.clone();
+
+                    // let mut manager = &self.app_state.connection_manager.lock().await;
+                    let fut = async move {
+                        let mut manager = app_state.connection_manager.lock().await;
+                        let res = sqlx::query(
+                            "INSERT INTO friend_requests (sender_uuid, receiver_uuid) VALUES (?, ?)"
+                        )
+                        .bind(&sender_uuid)
+                        .bind(&receiver_uuid_clone)
+                        .execute(&pool)
+                        .await;
+
+                        let server_msg = match res {
+                            Ok(_) => {
+                                ServerMessage {
+                                    msg: "Demande d'ami envoyée avec succès.".to_string(),
+                                    r#type: "friend_request_sent".to_string(),
+                                    message: "".to_string(),
+                                    name: None,
+                                    room_uuid: None,
+                                    user_uuid: Some(receiver_uuid_clone.clone()),
+                                    json: None,
+                                }
+                            }
+                            Err(e) => {
+                                println!("Erreur lors de l'insertion de la demande d'ami: {:?}", e);
+                                ServerMessage {
+                                    msg: "Erreur lors de l'envoi de la demande.".to_string(),
+                                    r#type: "error".to_string(),
+                                    message: format!("Erreur SQL: {}", e),
+                                    name: None,
+                                    room_uuid: None,
+                                    user_uuid: None,
+                                    json: None,
+                                }
+                            }
+                        };
+
+                        // Envoyer au receiver s’il est connecté
+                        if let Some(addr) = manager.user_connections.get(&receiver_uuid) {
+                            let json = serde_json::to_string(&server_msg).unwrap();
+                            let _ = addr.do_send(MyMessage(json));
+                        }
+
+                        server_msg
+                    };
+
+                    ctx.spawn(
+                        fut::wrap_future(fut).map(|server_msg, _, ctx: &mut WebsocketContext<MyWebSocket>| {
+                            // Envoyer aussi au sender
+                            ctx.text(serde_json::to_string(&server_msg).unwrap_or_default());
+                        })
+                    );
+                }
+
+
                 Ok(ClientMessage::Chat { room_uuid, message }) => {
                     println!("Message dans room {:?}: {}", room_uuid, message);
                 
@@ -406,6 +478,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                     let pool = self.db_pool.clone();
                     let uuid = self.user_uuid.clone();
                     let room_uuid_clone = room_uuid.clone();
+                    let app_state = self.app_state.clone(); // pour accéder au connection_manager
                     
                     // Parse UUID once before the lock
                     match Uuid::parse_str(&room_uuid) {
@@ -773,6 +846,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                         }),
                     );
                 }
+                
                 Ok(ClientMessage::UpdateRoomName{room_uuid, content }) => {
                     println!("\x1b[0;31m editRoomName ! \x1b[0m");
                     let pool = self.db_pool.clone();

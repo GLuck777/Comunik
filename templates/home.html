@@ -51,6 +51,7 @@
     </div>
   </div>
   <!-- Fin Notification -->
+   <!-- Cellule de présentation -->
   <div class="corpus_holmes identity">
     <div class="form_room">
       <p>Connecté en tant que : <strong>{{ username }}</strong> ({{ email }})  {{ uuid }}</p>
@@ -89,8 +90,10 @@
       <!-- fin modale-->
     </div>
   </div>
-  <div class="corpus_holmes"></div>
+  <!-- Fin de cellule de présentation -->
+  <!-- Cellule principale -->
   <div class="corpus_holmes">
+    <!-- Onglet pour changer de secteur -->
     <div class="tabs">
       <button id="btn_room" class="active-tab" onclick="showTab('room_tab')">Rooms</button>
       <button id="btn_search" onclick="showTab('search_tab')">Recherche</button>
@@ -108,15 +111,17 @@
               <path d="m21 21-4.3-4.3"></path>
             </svg>
             <input type="text" placeholder="Search users..." 
-            class="search_bar" value="a">
+            class="search_bar" value="">
             
           </div>
           <datalist id="user_list"></datalist>
-          <div id="list_user" class="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg overflow-hidden z-50"></div>
+          <div id="list_user" class=""></div>
         </div> <!-- fin zone de recherche-->
         <!-- Zone de liste amis -->
         <div class="right_search">
           <h3>Liste des membres affiliés</h3>
+          <div id="list_demand" class=""></div>
+
         </div>
       </div>
     </div>
@@ -204,7 +209,11 @@
           </div>
         </div>
         <!-- a finir en ajoutant le nom de tous les membres disponibles-->
+         <!-- En travaux : ajouter systeme de recherche -->
         <aside class="list_room">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" id="rotate_icon" class="svg_retry">
+            <path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6s-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8s-3.58-8-8-8"/>
+          </svg>
           <h2>Rooms disponibles :</h2>
           {% if rooms and rooms | length > 0 %}
               <div class="rooms_container" id="rooms_container">
@@ -274,7 +283,7 @@
         console.log("Unexpected disconnect. Trying to reconnect in 5 seconds...");
         // setTimeout(() => {
           // console.clear();
-          // connectToWebSocket(path);
+          // connectTo_WebSocket(path);
         // }, 5000);
       }
     };
@@ -506,6 +515,7 @@
     document.getElementById("roomModal").style.display = "none";
   }
 
+  // function inutilisée pour récupérer la liste des utilisateurs
   async function fetch_users() {  
     console.log("Loading users:");
     await connectToWebSocket();
@@ -573,14 +583,16 @@
     pP.appendChild(strongP);
     divP.appendChild(titleP);
     divP.appendChild(pP);
-    roomsContainer.appendChild(divP);
+    // roomsContainer.appendChild(divP);
+    roomsContainer.insertBefore(divP, roomsContainer.firstChild);
+
       // <div class="room_card" onclick="openRoom('room.room_uuid')">
       // <h3>room.name</h3>
       // <p><strong>Membres :</strong>room.member_count</p>
       // </div>
   }
   
-  // === Gestion des messages ===
+  // === Gestion des messages websocket ===
   async function handleIncomingMessage(data) {
     // console.log("j'entre ici dans handleIncomingMessage")
     let parsed;
@@ -624,7 +636,11 @@
       case "list_users":
         console.log("voici tous les utilisateurs!:\n\t", parsed.json);
         // console.log("\nvoici tous les utilisateurs!:", parsed);
-        displayTempListUser(parsed.json);
+        // displayTempListUser(parsed.json);
+        liste_utilisateurs = [];
+        parsed.json.forEach(element => {
+                liste_utilisateurs.push({ pseudo: element.pseudo, uuid: element.uuid });
+        });
         break;
       case "new_message":
         // messages_json: []
@@ -729,8 +745,23 @@
         datalist.appendChild(option);
 
         let btnDispatch = document.createElement("button");
-        btnDispatch.textContent = "Suivre ?";
-        btnDispatch.onclick = () => demandeAmis(element.uuid);
+        if (element.status === "following") {
+          btnDispatch.textContent = "Déjà suivi";
+          btnDispatch.disabled = true;
+          btnDispatch.classList.add("btn_following");
+        } else if (element.status === "pending") {
+          btnDispatch.textContent = "Demande en cours";
+          btnDispatch.disabled = true;
+          btnDispatch.classList.add("btn_pending");
+        } else {
+          // Status = not_following
+          btnDispatch.textContent = "Suivre";
+          btnDispatch.onclick = () => askFriend(element.uuid);
+          btnDispatch.classList.add("btn_follow");
+        }
+        
+
+
         let divDispatch = document.createElement("div");
         divDispatch.className = "card_users";
         divDispatch.id = element.uuid;
@@ -746,12 +777,42 @@
     });
   }
 
-  function demandeAmis(uuid){
-    console.log("uuid", uuid)
+  // effectue un enregistrement dans la table Demande_amis et dans notification pour informer le principal interessé
+  function askFriend(receiverUuid) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket is not open.");
+      return;
+    }
+    console.log("uuid", receiverUuid)
     // faire le fetch dans le back pour faire la demande d'amis 
     // suivre ? -> verification si tu l'as deja follow par un unfollow
     // dans la liste d'amis (function pas encore faite) faire un bouton unfollow egalement
+
+    try {
+      const msg = {
+        type: "ask_friend",
+        receiver_uuid: receiverUuid,
+      };
+
+      socket.send(JSON.stringify(msg));
+      console.log("Sent ask_friend message to:", receiverUuid);
+    } catch (e) {
+      console.error("Error sending ask_friend message:", e);
+    }
+    // 🔁 Récupérer la valeur actuelle de l’input de recherche
+    const searchInput = document.querySelector('.left_search input');
+    const search = searchInput.value.trim();
+  
+    // 🔄 Refaire un fetch pour actualiser la liste des utilisateurs
+    if (search.length > 0) {
+      fetch(`/api/search_users?query=${encodeURIComponent(search)}`)
+        .then(res => res.json())
+        .then(json => displayTempListUser(json))
+        .catch(err => console.error("Error fetching updated user list:", err));
+    }
   }
+
+
   //reception de tous les messages entrant pour une room
   function displayRoomMessages(messages) {
     // id: 3
@@ -1022,6 +1083,12 @@
       console.log("rooms: \n",rooms)
       displayRooms(rooms);
   }
+  async function displayAllFriendRequest(){
+    const resu = await fetch(`/api/demand/${current_user_uuid}`);
+      const requests = await resu.json();
+      console.log("rooms ULTIMEFLASH: \n",requests)
+      // displayResquest(requests);
+  }
 
   // === Modale création room ===
   function setupRoomModal() {
@@ -1093,6 +1160,7 @@
     //debut pour travailler sur les utilisateurs EN TRAVAUX
     if (typeof fetch_users === 'function') fetch_users();
     if (typeof displayAllRooms === 'function') displayAllRooms();
+    if (typeof displayAllFriendRequest === 'function') displayAllFriendRequest();
 
     // bloc de suggestion invité for room creation for smooth search
     // const input = document.getElementById('invitees_input');
@@ -1192,6 +1260,27 @@
     initInviteeSuggestions('invitees_input', 'invitees_suggestions');
     initInviteeSuggestions('new_inv', 'new_inv_suggestions');
 
+    //animation pour un svg + raffraichissement des rooms pour anticiper une nouvelle arrivée 
+    const icon = document.getElementById('rotate_icon');
+
+    icon.addEventListener('click', () => {
+      if (typeof displayAllRooms === 'function') displayAllRooms();
+      // Applique la rotation animée à -180deg
+      icon.style.transition = 'transform 0.3s';
+      icon.style.transform = 'rotate(-360deg)';
+
+      // Après 300ms (animation terminée), désactive transition, remet à 0 instantanément
+      setTimeout(() => {
+        icon.style.transition = 'none';
+        icon.style.transform = 'rotate(0deg)';
+
+        // Rétablit la transition pour les prochains clics
+        setTimeout(() => {
+          icon.style.transition = 'transform 0.3s';
+        }, 20);
+      }, 600);
+    });
+  //
 
     // search bar pour rechercher membres
     document.querySelector('.left_search input').addEventListener('input', function() {
@@ -1199,6 +1288,7 @@
       console.log("search: ", search);
 
       if (search.length > 0) {
+        console.log("############################################đ€¶đ→ø€đ€¶")
         // fetch ton endpoint ici, par exemple :
         fetch(`/api/search_users?query=${encodeURIComponent(search)}`)
           .then(res => res.json())
