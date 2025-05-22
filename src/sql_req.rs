@@ -515,6 +515,24 @@ pub async fn get_user_name(pool: &sqlx::SqlitePool, user_uuid: &str) -> Result<S
     // println!("============> pseudo true or false: {}", pseudo.0);
     Ok(pseudo.0)
 }
+pub async fn get_user_email(pool: &sqlx::SqlitePool, user_uuid: &str) -> Result<String, sqlx::Error>  {
+    // println!("get_user_name is_user_in_room ?");
+    let email: (String,) = sqlx::query_as(
+        "SELECT email FROM users WHERE uuid = ?"
+    )
+    .bind(user_uuid)
+    .fetch_one(pool)
+    .await?;
+    // if let Err(e) = count {
+    //     println!(
+    //         "Erreur lors de l'insertion du message pour {}: {:?}",
+    //         room_uuid, e
+    //     );
+    // }
+
+    // println!("============> pseudo true or false: {}", pseudo.0);
+    Ok(email.0)
+}
 pub async fn get_room_name(pool: &sqlx::SqlitePool, room_uuid: &str) -> Result<String, sqlx::Error>  {
     // println!("get_user_name is_user_in_room ?");
     let room_name: (String,) = sqlx::query_as(

@@ -1,55 +1,4 @@
-/* body{
-    background-color: #32746D;
-    color: white;
-} */
-/* .access_square{
-    position: fixed;
-    width: 50%;
-    height: 80%;
-    left: 50%;
-    top: 54%;
-    transform: translate(-50%, -50%);
-    background-color: #9EC5AB;
-    color: black;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    border: 4px double #011502;
-    border-radius: 8px;
-}
-.access_square #edit_form_btn{
-    width: 20%;
-    background-color: #104F55;
-}
-* {
-  margin: 0;
-  padding: 0;
-  text-decoration: none;
-  list-style: none;
-    list-style-type: none;
-  list-style-type: none;
-}
-.pass_code{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-.pass_code input{
-    margin-top: 1rem;
-    border: none;
-    border-radius: 4px;
-    padding: 0.5rem;
-    background: #104F55;
-    color: white;
-    
-}
-.pass_code button{
-    margin-top: 0.5rem;
-    border: 2px solid #104F55;
-    border-radius: 8px;
-    padding: 0.4rem;
-    width: 100%;
-}*/
+
 .edit_form .start_btn{
     margin-top: 0.5rem;
     border: 2px solid #104F55;
@@ -154,3 +103,55 @@
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
+
+/* TEST friendlist version chat gpt */
+#friends-container {
+  margin: 20px auto;
+  max-width: 600px;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.friend-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s;
+}
+
+.friend-card:hover {
+  transform: translateY(-2px);
+}
+
+.friend-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.friend-name {
+  font-weight: bold;
+  color: #0077cc;
+  text-decoration: none;
+}
+
+.friend-name:hover {
+  text-decoration: underline;
+}
+
+.friend-date {
+  font-size: 0.85em;
+  color: #666;
+}
+

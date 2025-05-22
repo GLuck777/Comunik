@@ -46,28 +46,31 @@
         <a href="/home">Retour à la page principale</a>
     </div> -->
     <div class="profile-container">
-    <h1>Profil de {{ pseudo }}</h1>
+      <h1>Profil de {{ pseudo }}</h1>
 
-    <div class="profile-details">
-        <form id="profile_form" class="edit_form" method="POST" action="/update_profile">
-            
-            <label>Email :</label>
-            <input type="email" name="email" value="{{ email }}" readonly>
+      <div class="profile-details">
+          <form id="profile_form" class="edit_form" method="POST" action="/update_profile">
+              
+              <label>Email :</label>
+              <input type="email" name="email" value="{{ email }}" readonly>
 
-            <label>Pseudo :</label>
-            <input type="text" name="pseudo" value="{{ pseudo }}" readonly>
+              <label>Pseudo :</label>
+              <input type="text" name="pseudo" value="{{ pseudo }}" readonly>
 
-            {% if is_owner %}
-            <div class="btn-group">
-                <button type="button" id="edit_btn" class="edit-btn">Modifier</button>
-                <button type="submit" id="save_btn" class="save-btn" style="display: none;">Enregistrer</button>
-            </div>
-            {% endif %}
-        </form>
+              {% if is_owner %}
+              <p id="message_erreur"></p>
+              <div class="btn-group">
+                  <button type="button" id="edit_btn" class="edit-btn">Modifier</button>
+                  <button type="submit" id="save_btn" class="save-btn" style="display: none;">Enregistrer</button>
+              </div>
+              {% endif %}
+          </form>
+          <div id="friends-container">
+            <h2>Mes Amis</h2>
+            <div id="friend-list" class="friend-list"></div>
+          </div>
+      </div>
     </div>
-
-    
-</div>
 
 
     <script>
@@ -80,6 +83,38 @@
         const pseudoInput = document.querySelector('input[name="pseudo"]');
         const submitBtn = document.getElementById('edit_btn');
         const saveBtn = document.getElementById("save_btn"); // pour confirmer
+        
+        function displayList(friendlist) {
+          const listContainer = document.getElementById('friend-list');
+          listContainer.innerHTML = ''; // Clear old list
+
+          if (friendlist.length === 0) {
+            listContainer.innerHTML = "<p>Aucun ami pour le moment.</p>";
+            return;
+          }
+
+          friendlist.forEach(friend => {
+            const card = document.createElement('div');
+            card.className = 'friend-card';
+
+            card.innerHTML = `
+              <div class="friend-info">
+                <a href="/profile/show/${friend.uuid}" class="friend-name">${friend.pseudo}</a>
+                <span class="friend-date">Ami depuis le ${new Date(friend.created_at).toLocaleDateString()}</span>
+              </div>
+            `;
+
+            listContainer.appendChild(card);
+          });
+        }
+        // /api/friendlist
+        async function displayFriendList(){
+          const resu = await fetch(`/api/friendlist`);
+            const friendlist = await resu.json();
+            console.log("rooms ULTIMEFLASH: \n",friendlist)
+            displayList(friendlist);
+        }
+        if (typeof displayFriendList === 'function') displayFriendList();
 
         document.querySelector("form.edit_form").addEventListener("submit", async function (e) {
             e.preventDefault();
@@ -90,27 +125,27 @@
             };
 
             
-              const res = await fetch("/profile/edit", {
-                  method: "POST",
-                  headers: {
-                      "Content-Type": "application/json"
-                  },
-                  body: JSON.stringify(data)
-              });
+            const res = await fetch("/profile/edit", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(data)
+            });
       
-              const text = await res.text();
-              
-              console.log("donnée", data)
-              console.log("res", res)
-              if (res.ok) {
-                  messageEl.innerText = "Profil mis à jour avec succès. Redirection...";
-                  // Rediriger après 1.5 seconde
-                  setTimeout(() => {
-                      window.location.href = "/profile";
-                  }, 1500);
-              } else {
-                  messageEl.innerText = "Erreur : " + text;
-              }
+            const text = await res.text();
+            
+            console.log("donnée", data)
+            console.log("res", res)
+            if (res.ok) {
+                messageEl.innerText = "Profil mis à jour avec succès. Redirection...";
+                // Rediriger après 1.5 seconde
+                setTimeout(() => {
+                    window.location.href = "/profile";
+                }, 1500);
+            } else {
+                messageEl.innerText = "&Erreur : " + text;
+            }
         });
         
         const checkForChanges = () => {

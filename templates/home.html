@@ -120,6 +120,9 @@
         <!-- Zone de liste amis -->
         <div class="right_search">
           <h3>Liste des membres affiliés</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" id="" class="svg_retry refresh_icon" data-action="refreshRequest">
+            <path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6s-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8s-3.58-8-8-8"/>
+          </svg>
           <div id="list_demand" class=""></div>
 
         </div>
@@ -211,7 +214,7 @@
         <!-- a finir en ajoutant le nom de tous les membres disponibles-->
          <!-- En travaux : ajouter systeme de recherche -->
         <aside class="list_room">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" id="rotate_icon" class="svg_retry">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" id="rotate_icon" class="svg_retry refresh_icon" data-action="refreshRooms">
             <path fill="currentColor" d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6s-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8s-3.58-8-8-8"/>
           </svg>
           <h2>Rooms disponibles :</h2>
@@ -468,7 +471,7 @@
         lienCol.id = uuid;
         lienCol.textContent = pseudo;
         lienCol.target = "_blank";
-        lienCol.href = `/profile/${uuid}`;
+        lienCol.href = `/profile/show/${uuid}`;
 
         if (owner){
           pngCol = document.createElement("div");
@@ -636,7 +639,7 @@
       case "list_users":
         console.log("voici tous les utilisateurs!:\n\t", parsed.json);
         // console.log("\nvoici tous les utilisateurs!:", parsed);
-        // displayTempListUser(parsed.json);
+        // display_TempListUser(parsed.json);
         liste_utilisateurs = [];
         parsed.json.forEach(element => {
                 liste_utilisateurs.push({ pseudo: element.pseudo, uuid: element.uuid });
@@ -749,10 +752,33 @@
           btnDispatch.textContent = "Déjà suivi";
           btnDispatch.disabled = true;
           btnDispatch.classList.add("btn_following");
+
         } else if (element.status === "pending") {
-          btnDispatch.textContent = "Demande en cours";
-          btnDispatch.disabled = true;
+          btnDispatch.textContent = "Annuler la demande en cours";
+          btnDispatch.disabled = false;
           btnDispatch.classList.add("btn_pending");
+          btnDispatch.onclick = () => cancelFriendRequest(element.uuid);
+
+        } else if (element.status === "incoming") {
+          // Deux boutons : Accepter & Refuser
+
+          btnDispatch.textContent = "Accepter";
+          btnDispatch.classList.add("btn_accept");
+          btnDispatch.onclick = () => acceptFriend(element.uuid);
+
+          const declineBtn = document.createElement("button");
+          declineBtn.textContent = "Refuser";
+          declineBtn.classList.add("btn_decline");
+          declineBtn.onclick = () => declineFriend(element.uuid);
+
+          // Crée un conteneur pour les deux boutons
+          const btnContainer = document.createElement("div");
+          btnContainer.classList.add("friend_action_buttons");
+          btnContainer.appendChild(btnDispatch);
+          btnContainer.appendChild(declineBtn);
+
+          friendItem.appendChild(btnContainer); // <- important
+          return;
         } else {
           // Status = not_following
           btnDispatch.textContent = "Suivre";
@@ -768,7 +794,7 @@
 
         let aDispatch = document.createElement("a");
         aDispatch.textContent = element.pseudo;
-        aDispatch.href = "/profile/" + element.uuid;
+        aDispatch.href = "/profile/show/" + element.uuid;
         aDispatch.target = "_blank";
 
         divDispatch.appendChild(aDispatch);
@@ -1035,6 +1061,7 @@
       // console.log("notifs: \n",notifications)
       displayNotifications(notifications);
   }
+  
   function getTimeAgo(dateString) {
     const now = new Date();
     const created = new Date(dateString.replace(" ", "T")); // compatibilité ISO
@@ -1089,6 +1116,46 @@
     });
   }
   
+  async function acceptFriend(sender_uuid){
+    console.log("accept this: ", sender_uuid, "with", current_user_uuid);
+    // vers handlers -> acceptRequest -> friends_requests -, friendships +, notification for sender 
+    const resu = await fetch(`/api/demand/accept/${sender_uuid}`);
+    const res = await resu.json();
+    displayAllFriendRequest()
+    displayAllNotifs();
+  }
+  async function declineFriend(sender_uuid){
+    console.log("decline", sender_uuid, "with", current_user_uuid);
+    // vers handlers -> acceptRequest -> friends_requests -, notification for sender
+    const resu = await fetch(`/api/demand/decline/${sender_uuid}`);
+    const res = await resu.json();
+    displayAllFriendRequest()
+    displayAllNotifs();
+  }
+  async function cancelFriendRequest(receiver_uuid){
+    console.log("cancel friend request with", receiver_uuid, "i am", current_user_uuid);
+    const response = await fetch(`/api/friend/cancel/${receiver_uuid}`, {
+      method: "DELETE"
+    });
+
+    if (response.ok) {
+      // alert("Demande annulée !");
+      // 🔁 Récupérer la valeur actuelle de l’input de recherche
+      const searchInput = document.querySelector('.left_search input');
+      const search = searchInput.value.trim();
+    
+      // 🔄 Refaire un fetch pour actualiser la liste des utilisateurs
+      if (search.length > 0) {
+        fetch(`/api/search_users?query=${encodeURIComponent(search)}`)
+          .then(res => res.json())
+          .then(json => displayTempListUser(json))
+          .catch(err => console.error("Error fetching updated user list:", err));
+      }
+    } else {
+      // alert("Erreur lors de l'annulation");
+      console.log("Erreur lors de l'annulation");
+    }
+  }
   // === Friend Request ===
   function displayResquest(requests){
     request_list = document.getElementById("list_demand")
@@ -1106,7 +1173,7 @@
 
       // Lien vers le profil
       const profileLink = document.createElement("a");
-      profileLink.href = `/profile/${sender_uuid}`;
+      profileLink.href = `/profile/show/${sender_uuid}`;
       profileLink.textContent = sender_pseudo + " veut se lier à vous.";
       profileLink.target = "_blank";
       profileLink.style.color = "white";
@@ -1121,12 +1188,12 @@
       const acceptBtn = document.createElement("button");
       acceptBtn.className = "btn_accept"
       acceptBtn.textContent = "Accepter";
-      acceptBtn.onclick = () => acceptFriend(sender_uuid); // à définir ailleurs
+      acceptBtn.onclick = () => acceptFriend(sender_uuid);
 
       const declineBtn = document.createElement("button");
       declineBtn.className = "btn_decline"
       declineBtn.textContent = "Refuser";
-      declineBtn.onclick = () => declineFriend(sender_uuid); // à définir ailleurs
+      declineBtn.onclick = () => declineFriend(sender_uuid);
 
       // Ajout des éléments dans la carte
       requestDiv.appendChild(profileLink);
@@ -1228,44 +1295,6 @@
     if (typeof displayAllRooms === 'function') displayAllRooms();
     if (typeof displayAllFriendRequest === 'function') displayAllFriendRequest();
 
-    // bloc de suggestion invité for room creation for smooth search
-    // const input = document.getElementById('invitees_input');
-    // const suggestionBox = document.getElementById('invitees_suggestions');
-    // input.addEventListener('input', function () {
-    //   const fullInput = this.value;
-    //   const parts = fullInput.split(',');
-    //   const currentQuery = parts[parts.length - 1].trim().toLowerCase();
-    //   suggestionBox.innerHTML = '';
-    //   if (currentQuery.length === 0) {
-    //     suggestionBox.style.display = 'none';
-    //     return;
-    //   }
-    //   // deuxieme secutrité user.uuid !== current_user_uuid
-    //   const results = liste_utilisateurs.filter(user =>
-    //     user.uuid !== current_user_uuid && (
-    //       user.pseudo.toLowerCase().includes(currentQuery) ||
-    //       user.uuid.toLowerCase().includes(currentQuery)
-    //     )
-    //   );
-    //   if (results.length > 0) {
-    //     results.forEach(user => {
-    //       const li = document.createElement('li');
-    //       li.textContent = `${user.pseudo} (${user.uuid})`;
-    //       li.dataset.uuid = user.uuid;
-    //       li.addEventListener('click', () => {
-    //         // Remplace la dernière entrée par l'UUID sélectionné
-    //         parts[parts.length - 1] = ` ${user.uuid}`;
-    //         input.value = parts.map(p => p.trim()).join(', ') + ', ';
-    //         suggestionBox.style.display = 'none';
-    //         input.focus();
-    //       });
-    //       suggestionBox.appendChild(li);
-    //     });
-    //     suggestionBox.style.display = 'block';
-    //   } else {
-    //     suggestionBox.style.display = 'none';
-    //   }
-    // });
     function initInviteeSuggestions(inputId, suggestionBoxId) {
       const input = document.getElementById(inputId);
       const suggestionBox = document.getElementById(suggestionBoxId);
@@ -1327,26 +1356,55 @@
     initInviteeSuggestions('new_inv', 'new_inv_suggestions');
 
     //animation pour un svg + raffraichissement des rooms pour anticiper une nouvelle arrivée 
-    const icon = document.getElementById('rotate_icon');
+    // const icon = document.getElementById('rotate_icon');
 
-    icon.addEventListener('click', () => {
-      if (typeof displayAllRooms === 'function') displayAllRooms();
-      // Applique la rotation animée à -180deg
-      icon.style.transition = 'transform 0.3s';
-      icon.style.transform = 'rotate(-360deg)';
+    // icon.addEventListener('click', () => {
+    //   if (typeof displayAllRooms === 'function') displayAllRooms();
+    //   // Applique la rotation animée à -180deg
+    //   icon.style.transition = 'transform 0.3s';
+    //   icon.style.transform = 'rotate(-360deg)';
 
-      // Après 300ms (animation terminée), désactive transition, remet à 0 instantanément
-      setTimeout(() => {
-        icon.style.transition = 'none';
-        icon.style.transform = 'rotate(0deg)';
+    //   // Après 300ms (animation terminée), désactive transition, remet à 0 instantanément
+    //   setTimeout(() => {
+    //     icon.style.transition = 'none';
+    //     icon.style.transform = 'rotate(0deg)';
 
-        // Rétablit la transition pour les prochains clics
+    //     // Rétablit la transition pour les prochains clics
+    //     setTimeout(() => {
+    //       icon.style.transition = 'transform 0.3s';
+    //     }, 20);
+    //   }, 600);
+    // });
+    /////////////////////
+    document.querySelectorAll('.refresh_icon').forEach(icon => {
+      icon.addEventListener('click', () => {
+        const action = icon.getAttribute('data-action');
+
+        // Appel de la fonction correspondante
+        if (action === "refreshRooms" && typeof displayAllRooms === 'function') {
+          displayAllRooms();
+        } else if (action === "refreshRequest" && typeof displayAllFriendRequest === 'function') {
+          displayAllFriendRequest();
+        } 
+        // else if (action === "refreshStats" && typeof refreshStats === 'function') {
+        //   refreshStats();
+        // }
+
+        // Animation
+        icon.style.transition = 'transform 0.3s';
+        icon.style.transform = 'rotate(-360deg)';
+
         setTimeout(() => {
-          icon.style.transition = 'transform 0.3s';
-        }, 20);
-      }, 600);
+          icon.style.transition = 'none';
+          icon.style.transform = 'rotate(0deg)';
+
+          setTimeout(() => {
+            icon.style.transition = 'transform 0.3s';
+          }, 20);
+        }, 600);
+      });
     });
-  //
+
 
     // search bar pour rechercher membres
     document.querySelector('.left_search input').addEventListener('input', function() {
@@ -1387,10 +1445,10 @@
       const id = button.id;
       switch (id) {
         case "profil_show":
-          window.location.href = "/profile/"+current_user_uuid;
+          window.location.href = "/profile/show/"+current_user_uuid;
           break;
         case "profil_peek":
-          window.location.href = "/profile/"+current_user_uuid;
+          window.location.href = "/profile/show/"+current_user_uuid;
           break;
         // Add other cases here
         default:

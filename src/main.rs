@@ -142,12 +142,16 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/logout").route(web::post().to(handlers::logout)))
             .service(web::resource("/home").route(web::get().to(handlers::home)))
             .service(web::resource("/profile").route(web::get().to(handlers::profile)))
-            .service(web::resource("/profile/{user_uuid}").route(web::get().to(handlers::profile_uuid)))
+            .service(web::resource("/profile/show/{user_uuid}").route(web::get().to(handlers::profile_uuid)))
             .service(web::resource("/profile/edit").route(web::post().to(handlers::update_profile)))
             .service(web::resource("/api/room/{user_uuid}").route(web::get().to(get_room_by_uuid)))
             .service(web::resource("/api/rooms/{user_uuid}").route(web::get().to(get_user_rooms)))
             .service(web::resource("/api/notif/{user_uuid}").route(web::get().to(get_user_notifications))) // in use
-            .service(web::resource("/api/demand/{user_uuid}").route(web::get().to(get_friend_request))) // in use
+            .service(web::resource("/api/demand/{user_uuid}").route(web::get().to(get_friend_request))) // friend path
+            .service(web::resource("/api/demand/accept/{sender_uuid}").route(web::get().to(friend_request_accept))) // friend path
+            .service(web::resource("/api/demand/decline/{sender_uuid}").route(web::get().to(friend_request_decline))) // friend path
+            .service(web::resource("/api/friend/cancel/{receiver_uuid}").route(web::delete().to(cancel_friend_request))) // friend path
+            .service(web::resource("/api/friendlist").route(web::get().to(get_friends_list))) // friend path
             .service(web::resource("/api/search_users").route(web::get().to(search_users))) // in use
             .service(web::resource("/api/notifications/{user_uuid}").route(web::get().to(get_notifications)))
             .service(web::resource("/api/notificationsD/{id}").route(web::delete().to(delete_notification)))

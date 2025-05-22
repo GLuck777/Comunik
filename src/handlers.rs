@@ -209,6 +209,7 @@ pub async fn login_post(
                             let jwt_secret = "comunik_session_key"; // stocke-le dans une variable d'environnement en prod !
                             let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(jwt_secret.as_ref())).unwrap();
                             // fin de creation du token json
+                            // session.insert("uuid", &uuid).unwrap();
                             session.insert("email", form.email.clone()).unwrap();
                             session.insert("pseudo", &pseudo).unwrap();
 
@@ -239,7 +240,7 @@ pub async fn login_post(
                                 
                                 // Nous ne pouvons pas encore enregistrer de connection (websocket), 
                                 // mais nous pouvons stocker les données
-                                manager.user_data.insert(uuid.clone(), user_data).unwrap();
+                                manager.user_data.insert(uuid.clone(), user_data);
 
                                 println!("=== Utilisateurs connectés ===");
                                 for (uuid, data) in manager.user_data.iter() {
@@ -382,9 +383,14 @@ pub async fn logout(
     // HttpResponse::Found().append_header(("Location", "/login")).finish()
 }
 
-pub async fn home(req: HttpRequest, session: Session, pool: web::Data<SqlitePool>) -> impl Responder {
+// handler qui gère la page principale dans le projet
+pub async fn home(req: HttpRequest, session: Session, pool: web::Data<SqlitePool>, app_state: web::Data<AppState>) -> impl Responder {
     if let Ok(Some(uuid)) = session.get::<String>("uuid") {
-        let email = session.get::<String>("email").unwrap_or(None).unwrap_or_default();
+        let emailbis = session.get::<String>("email").unwrap_or(None).unwrap_or_default();
+        let email = match get_user_email(&pool, &uuid).await{
+            Ok(name) => name,
+            Err(_) => emailbis,
+        };
         let usernamebis = session.get::<String>("pseudo").unwrap_or(None).unwrap_or_default();
         let username = match get_user_name(&pool, &uuid).await{
             Ok(name) => name,
@@ -395,15 +401,31 @@ pub async fn home(req: HttpRequest, session: Session, pool: web::Data<SqlitePool
         let rooms = get_rooms_for_user(&pool, &uuid).await.unwrap_or_else(|_| Vec::new());
 
         // Vérifier le contenu de rooms avant d'envoyer aux templates
-        println!("\n\tRooms: {:?}", rooms); // Affiche les rooms dans le terminal
+        // println!("\n\tRooms: {:?}", rooms); // Affiche les rooms dans le terminal
 
 
         if let Some(claims) = extract_claims_from_token(&req) {
             let mut ctx = Context::new();
             ctx.insert("uuid", &claims.sub);
-            ctx.insert("email", &claims.email);
-            ctx.insert("username", &claims.pseudo);
+            ctx.insert("email", &email);
+            ctx.insert("username", &username);
             ctx.insert("rooms", &rooms);
+
+            {
+                let mut manager = app_state.connection_manager.lock().await;
+                let user_data = UserData {
+                    email: claims.email,
+                    pseudo: claims.pseudo,
+                    last_activity: chrono::Utc::now(),
+                };
+                
+                // Nous ne pouvons pas encore enregistrer de connection (websocket), 
+                // mais nous pouvons stocker les données
+                manager.user_data.insert(uuid.clone(), user_data);
+            }
+
+
+
             render("home.html", ctx)
         } else {
             HttpResponse::Found().append_header(("Location", "/login")).finish() // doublon...
@@ -420,6 +442,7 @@ pub async fn home(req: HttpRequest, session: Session, pool: web::Data<SqlitePool
     }
 }
 
+// ancienne version de la recupération des rooms appartenant à un utilisateurs, il fait un count mais en front on liste les utilisateurs
 async fn get_rooms_for_user(pool: &web::Data<SqlitePool>, user_uuid: &str) -> Result<Vec<Rooms>, sqlx::Error> {
     println!("\n\tj'entre dans get_rooms_for_user\n");
     
@@ -445,6 +468,9 @@ async fn get_rooms_for_user(pool: &web::Data<SqlitePool>, user_uuid: &str) -> Re
         }
     }
 }
+
+
+// Lorsque la room est générée cette fonction est appelé pour récupérer la room et l'afficher sur la page 
 pub async fn get_room_by_uuid(
     pool: web::Data<SqlitePool>,
     room_uuid: web::Path<String>,
@@ -528,27 +554,7 @@ struct UserResult {
     status: String, // "following", "pending", "not_following"
 }
 
-//search_member
-// #[get("/api/search_users")]
-// pub async fn search_users(
-//     pool: web::Data<SqlitePool>,
-//     query: web::Query<HashMap<String, String>>,
-// ) -> impl Responder {
-//     // ajout verification true/false cette personne t'a deja envoyer une demande d'amis ou non, tu l'as deja suivi ou non
-//     let search = query.get("query").unwrap_or(&"".to_string()).to_lowercase();
-
-//     let users = sqlx::query_as::<_ , UserRow>(
-//         // struct qui contient au minimum `pseudo` et `uuid`
-//         "SELECT pseudo, uuid FROM users WHERE LOWER(pseudo) LIKE ? LIMIT 10",
-//     )
-//     .bind(format!("%{}%", search))
-//     .fetch_all(pool.get_ref())
-//     .await
-//     .unwrap_or_else(|_| vec![]);
-
-//     HttpResponse::Ok().json(users)
-// }
-
+// fonctionne de pair avec in input dans home.html qui va permettre de récupérer un nombre d'utilisateur selon l'entrée
 pub async fn search_users(
     pool: web::Data<SqlitePool>,
     query: web::Query<HashMap<String, String>>,
@@ -599,13 +605,30 @@ pub async fn search_users(
         .await
         .unwrap_or(0) > 0;
 
+        // Vérifie si l'utilisateur ciblé m'a envoyé une demande
+        let incoming = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM friend_requests WHERE sender_uuid = ? AND receiver_uuid = ? AND status = 'pending'"
+        )
+        .bind(&target_uuid)
+        .bind(&current_user_uuid)
+        .fetch_one(pool.get_ref())
+        .await
+        .unwrap_or(0) > 0;
+
+
         let status = if friends {
             "following"
         } else if pending {
-            "pending"
+            "pending" // j'ai envoyé
+        } else if incoming {
+            "incoming" // il m'a envoyé
         } else {
             "not_following"
         };
+        // "pending" → bouton "Annuler demande"
+        // "incoming" → bouton "Accepter" ou "Refuser"
+        // "not_following" → bouton "Ajouter"
+        // "following" → afficher "Ami"
 
         results.push(UserResult {
             pseudo: user.pseudo,
@@ -681,6 +704,7 @@ pub async fn get_user_rooms(
     Ok(HttpResponse::Ok().json(result))
 }
 
+// FRIEND ZONE //////////////
 #[derive(Debug, Serialize)]
 struct FriendRequestInfo {
     sender_uuid: String,
@@ -688,6 +712,7 @@ struct FriendRequestInfo {
     created_at: String,
 }
 
+//friend_requests
 pub async fn get_friend_request(
     pool: web::Data<SqlitePool>,
     user_uuid: web::Path<String>
@@ -728,6 +753,233 @@ pub async fn get_friend_request(
     println!("\x1b[0;31m {:?} \x1b[0m", results);
     Ok(HttpResponse::Ok().json(results))
 }
+
+// accepte une demande d'amis, et enregistre la data (friend_request -> following, friendships +) + notfication
+pub async fn friend_request_accept(pool: web::Data<SqlitePool>, session: Session, sender_uuid: web::Path<String>) -> Result<HttpResponse, actix_web::Error>{
+    
+    if let Ok(Some(uuid)) = session.get::<String>("uuid") {
+        let receiver_uuid = uuid;
+        let sender_uuid = sender_uuid.into_inner();
+        // Vérifie que la requête d'ami existe
+        let request = sqlx::query(
+            "SELECT * FROM friend_requests WHERE receiver_uuid = ? AND sender_uuid = ? AND status = 'pending'"
+        )
+        .bind(&receiver_uuid)
+        .bind(&sender_uuid)
+        .fetch_optional(pool.get_ref())
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+        if request.is_none() {
+            return Ok(HttpResponse::NotFound().body("Friend request not found"));
+        }
+        //verification pour eviter les doublons
+        let existing = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM friendships
+            WHERE (user1_uuid = ? AND user2_uuid = ?) OR (user1_uuid = ? AND user2_uuid = ?)"
+        )
+        .bind(&receiver_uuid)
+        .bind(&sender_uuid)
+        .bind(&sender_uuid)
+        .bind(&receiver_uuid)
+        .fetch_one(pool.get_ref())
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+        if existing == 0 {
+            // Insère une nouvelle ligne dans friendships
+            sqlx::query(
+                "INSERT INTO friendships (user1_uuid, user2_uuid) VALUES (?, ?)"
+            )
+            .bind(&receiver_uuid)
+            .bind(&sender_uuid)
+            .execute(pool.get_ref())
+            .await
+            .map_err(actix_web::error::ErrorInternalServerError)?;
+        
+            // Met à jour la table friend_requests
+            sqlx::query(
+                "UPDATE friend_requests SET status = 'following' WHERE receiver_uuid = ? AND sender_uuid = ?"
+            )
+            .bind(&receiver_uuid)
+            .bind(&sender_uuid)
+            .execute(pool.get_ref())
+            .await
+            .map_err(actix_web::error::ErrorInternalServerError)?;
+
+            let receiver_pseudo = match get_user_name(pool.get_ref(), &receiver_uuid).await {
+                Ok(name) => name,
+                Err(_) => "undef".to_string(),
+            };
+            sqlx::query(
+                "INSERT INTO notifications (user_uuid, message) VALUES (?, ?)",
+            )
+            .bind(&sender_uuid)
+            .bind(format!("Votre demande d'amis à été accepté par {}", receiver_pseudo))//{} owner_uuid
+            .execute(pool.get_ref())
+            .await
+            .map_err(actix_web::error::ErrorInternalServerError)?;
+        }
+        // if let Err(e) = result {
+        //     println!(
+        //         "Erreur lors de l'insertion dans notifications pour {}: {:?}",
+        //         receiver_uuid, e
+        //     );
+        // }
+
+    }
+    Ok(HttpResponse::Ok().json("Done".to_string()))
+}
+
+// decline une demande d'amis, et supprime la data dans friend_requests + notfication
+pub async fn friend_request_decline(
+    pool: web::Data<SqlitePool>, 
+    session: Session, 
+    sender_uuid: web::Path<String>
+) -> Result<HttpResponse, actix_web::Error> {
+    
+    if let Ok(Some(receiver_uuid)) = session.get::<String>("uuid") {
+        let sender_uuid = sender_uuid.into_inner();
+
+        // Vérifie que la requête existe
+        let request = sqlx::query(
+            "SELECT * FROM friend_requests WHERE receiver_uuid = ? AND sender_uuid = ? AND status = 'pending'"
+        )
+        .bind(&receiver_uuid)
+        .bind(&sender_uuid)
+        .fetch_optional(pool.get_ref())
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+        if request.is_none() {
+            return Ok(HttpResponse::NotFound().body("Friend request not found"));
+        }
+
+        // Supprimer la demande
+        sqlx::query(
+            "DELETE FROM friend_requests WHERE receiver_uuid = ? AND sender_uuid = ?"
+        )
+        .bind(&receiver_uuid)
+        .bind(&sender_uuid)
+        .execute(pool.get_ref())
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+        // Créer la notification
+        let receiver_pseudo = match get_user_name(pool.get_ref(), &receiver_uuid).await {
+            Ok(name) => name,
+            Err(_) => "Utilisateur inconnu".to_string(),
+        };
+
+        sqlx::query(
+            "INSERT INTO notifications (user_uuid, message) VALUES (?, ?)"
+        )
+        .bind(&sender_uuid)
+        .bind(format!("Votre demande d'amis a été déclinée par {}", receiver_pseudo))
+        .execute(pool.get_ref())
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+        
+        return Ok(HttpResponse::Ok().json("Friend request declined"));
+    }
+
+    Ok(HttpResponse::Unauthorized().body("Unauthorized"))
+}
+
+#[derive(Serialize)]
+struct Friend {
+    uuid: String,
+    pseudo: String, // Optionnel, si tu veux afficher les noms dans la liste
+    created_at: String,
+}
+
+pub async fn get_friends_list(
+    pool: web::Data<SqlitePool>, 
+    session: Session) 
+    -> Result<HttpResponse, actix_web::Error> {
+if let Ok(Some(user_uuid)) = session.get::<String>("uuid") {
+        // Récupère toutes les amitiés où l'utilisateur est impliqué
+        let friendships = sqlx::query(
+            "SELECT user1_uuid, user2_uuid, created_at FROM friendships WHERE user1_uuid = ? OR user2_uuid = ?")
+        .bind(&user_uuid)
+        .bind(&user_uuid)
+        .fetch_all(pool.get_ref())
+        .await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+        let mut friends: Vec<Friend> = Vec::new();
+
+        for friendship in friendships {
+            let user1 = match friendship.try_get("user1_uuid"){
+                Ok(p) => p,
+                Err(_) => "Inconnu1".to_string(),
+            };
+            let user2 = match friendship.try_get("user2_uuid"){
+                Ok(p) => p,
+                Err(_) => "Inconnu2".to_string(),
+            };
+            let friend_uuid = if user1 == user_uuid {
+                user2
+            } else {
+                user1
+            };
+
+            // Facultatif : récupérer le pseudo ou d'autres infos
+            let friend_pseudo = match get_user_name(pool.get_ref(), &friend_uuid).await {
+                Ok(p) => p,
+                Err(_) => "Inconnu".to_string(),
+            };
+
+            let friend_since = match friendship.try_get("created_at"){
+                Ok(p) => p,
+                Err(_) => "NAD"
+            };
+
+            friends.push(Friend {
+                uuid: friend_uuid,
+                pseudo: friend_pseudo,
+                created_at: friend_since.to_string()
+            });
+        }
+
+        return Ok(HttpResponse::Ok().json(friends));
+    }
+
+    Ok(HttpResponse::Unauthorized().body("Unauthorized"))
+}
+
+pub async fn cancel_friend_request(
+    pool: web::Data<SqlitePool>,
+    session: Session,
+    receiver_uuid: web::Path<String>,
+) -> Result<HttpResponse, actix_web::Error> {
+    println!("STEP ONE");
+    let Some(sender_uuid) = session.get::<String>("uuid").unwrap_or(None) else {
+        return Ok(HttpResponse::Unauthorized().body("Non connecté"));
+    };
+    println!("STEP TWO");
+    let receiver_uuid = receiver_uuid.into_inner();
+
+    let result = sqlx::query(
+        "DELETE FROM friend_requests 
+         WHERE sender_uuid = ? AND receiver_uuid = ? AND status = 'pending'"
+    )
+    .bind(&sender_uuid)
+    .bind(&receiver_uuid)
+    .execute(pool.get_ref())
+    .await;
+    println!("STEP THREE");
+    match result {
+        Ok(query_result) if query_result.rows_affected() > 0 => {
+            Ok(HttpResponse::Ok().body("Demande annulée"))
+        },
+        _ => Ok(HttpResponse::NotFound().body("Aucune demande trouvée")),
+    }
+}
+
+// FIN DE LA FRIEND ZONE //////////////
+
+
 // GET /api/notifications/:user_uuid
 pub async fn get_notifications(
     pool: web::Data<SqlitePool>,
@@ -867,14 +1119,16 @@ pub struct ProfileUpdateData {
     email: String,
     pseudo: String,
 }
-
+// profile/edit [POST]
+//Permet à l'utilisateur de modifier ses informations contenu dans la table users
 pub async fn update_profile(
     session: Session,
     pool: web::Data<SqlitePool>,
     form: web::Json<ProfileUpdateData>,
 ) -> impl Responder {
-    println!("Tentative de update du profile......");
+    println!("\x1b[0;31m Tentative de update du profile......! \x1b[0m");
     if let Ok(Some(uuid)) = session.get::<String>("uuid") {
+        println!("\x1b[0;31m Tentative de uuid du profile {}......! \x1b[0m", &uuid);
         let res = sqlx::query("UPDATE users SET email = ?, pseudo = ? WHERE uuid = ?")
             .bind(&form.email)
             .bind(&form.pseudo)

@@ -604,7 +604,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for MyWebSocket {
                 }
                 
                 Ok(ClientMessage::GetUsersData{}) => {
-                    println!("\n\n\n\nRécupération des utilisateurs pour:\n\n\n\n");
+                    // println!("\n\n\n\nRécupération des utilisateurs pour:\n\n\n\n");
                     let pool = self.db_pool.clone();
                     let user_uuid = self.user_uuid.clone();
                     let mut username = "Anonyme".to_string();
