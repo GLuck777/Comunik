@@ -160,3 +160,14 @@ background-color: #ddd;
 #invitees-suggestions li:hover {
   background-color: #eee;
 }
+
+@media (max-width: 768px) {
+  #room-modal{
+    z-index: 1000;
+  }
+  .modal_add_room {
+    width: 80%;
+    max-width: 80%;
+    margin: auto;
+  }
+}

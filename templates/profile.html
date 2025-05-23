@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modifier votre profil</title>
     <link rel="icon" type="image/x-icon" href="/static/ressources/logoU.png">
     <link rel="stylesheet" type="text/css" href="/static/css/style_for_all.css">
@@ -51,11 +52,15 @@
       <div class="profile-details">
           <form id="profile_form" class="edit_form" method="POST" action="/update_profile">
               
-              <label>Email :</label>
-              <input type="email" name="email" value="{{ email }}" readonly>
-
-              <label>Pseudo :</label>
-              <input type="text" name="pseudo" value="{{ pseudo }}" readonly>
+              <div class="profile_line">
+                <label>Email :</label>
+                <input type="email" name="email" value="{{ email }}" readonly>
+              </div>
+              <br>
+              <div class="profile_line">
+                <label>Pseudo :</label>
+                <input type="text" name="pseudo" value="{{ pseudo }}" readonly>
+              </div>
 
               {% if is_owner %}
               <p id="message_erreur"></p>

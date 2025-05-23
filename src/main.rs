@@ -3,17 +3,15 @@ mod gestion_log;
 use gestion_log::*;
 use handlers::*;        // Cela permet d'utiliser les fonctions définies dans handlers.rs
 mod sql_req;
-use std::env;
+
 use env_logger;
 mod ws_init;
 mod connection_manager;
 use connection_manager::ConnectionManager;
+use crate::ws::ServerMessage;
 
 use tokio::sync::Mutex; // cree des conflits avec std sync
-
-
-
-// use actix_files::Files;
+use std::env;
 use actix_web::{web, App, HttpServer, HttpRequest, HttpResponse, middleware};
 use actix_web_actors::ws as other_ws;
 mod ws;
@@ -25,13 +23,12 @@ use actix_session::{SessionMiddleware, storage::CookieSessionStore};
 use actix_web::cookie::Key;
 use actix_files::Files; // Pour ajouter le CSS dans les pages
 
-// New imports
 use std::sync::{Arc}; // utilisé pour app_state.connection_manager pour l'async
 use std::collections::HashMap;
 use uuid::Uuid;
 use tokio::sync::broadcast;
 
-use crate::ws::ServerMessage;
+
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -47,10 +44,8 @@ pub async fn websocket_handler(
     stream: web::Payload, 
     session: Session,
     app_state: web::Data<AppState>,
-    // pool: web::Data<SqlitePool>,
-    path: Option<web::Path<String>> // <- ici
-) -> Result<HttpResponse, actix_web::Error> { //ajout: pool: web::Data<SqlitePool>
-    // other_ws::start(ws::MyWebSocket { db_pool: pool.get_ref().clone() }, &req, stream)
+    path: Option<web::Path<String>>
+) -> Result<HttpResponse, actix_web::Error> {
     let room_uuid = path.map(|p| p.into_inner());
     if let Some(uuid) = session.get::<String>("uuid")? {
         let ws = ws::MyWebSocket {
@@ -58,7 +53,7 @@ pub async fn websocket_handler(
             user_uuid: uuid,
             room_uuid,
             rooms: Arc::clone(&app_state.rooms),
-            app_state: app_state, //.clone()
+            app_state: app_state,
         };
         println!("\x1b[0;31m Start! \x1b[0m");
         other_ws::start(ws, &req, stream)
@@ -66,7 +61,6 @@ pub async fn websocket_handler(
         println!("\x1b[0;31m cinquieme partie de test \x1b[0m");
         Err(actix_web::error::ErrorUnauthorized("No UUID in session"))
     }
-    // other_ws::start(ws::MyWebSocket {}, &req, stream) // ancienne version sans pool
 }
 
 
@@ -131,8 +125,8 @@ async fn main() -> std::io::Result<()> {
                 CookieSessionStore::default(),
                 secret_key.clone(),
             )
-            .cookie_secure(false) // pour local, true en prod
-            .cookie_name("comunik_session".to_string()) // optionnel
+            .cookie_secure(true) // pour local, true en prod
+            .cookie_name("comunik_session".to_string())
             .build())
             .service(web::scope("/admin").route("/online-users", web::get().to(online_users)))
             .service(Files::new("/static", "./static").show_files_listing()) // enlever show_files_listening une fois le developpement effectué
@@ -146,13 +140,13 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/profile/edit").route(web::post().to(handlers::update_profile)))
             .service(web::resource("/api/room/{user_uuid}").route(web::get().to(get_room_by_uuid)))
             .service(web::resource("/api/rooms/{user_uuid}").route(web::get().to(get_user_rooms)))
-            .service(web::resource("/api/notif/{user_uuid}").route(web::get().to(get_user_notifications))) // in use
+            .service(web::resource("/api/notif/{user_uuid}").route(web::get().to(get_user_notifications))) 
             .service(web::resource("/api/demand/{user_uuid}").route(web::get().to(get_friend_request))) // friend path
             .service(web::resource("/api/demand/accept/{sender_uuid}").route(web::get().to(friend_request_accept))) // friend path
             .service(web::resource("/api/demand/decline/{sender_uuid}").route(web::get().to(friend_request_decline))) // friend path
             .service(web::resource("/api/friend/cancel/{receiver_uuid}").route(web::delete().to(cancel_friend_request))) // friend path
             .service(web::resource("/api/friendlist").route(web::get().to(get_friends_list))) // friend path
-            .service(web::resource("/api/search_users").route(web::get().to(search_users))) // in use
+            .service(web::resource("/api/search_users").route(web::get().to(search_users))) 
             .service(web::resource("/api/notifications/{user_uuid}").route(web::get().to(get_notifications)))
             .service(web::resource("/api/notificationsD/{id}").route(web::delete().to(delete_notification)))
             .service(web::resource("/ws/").route(web::get().to(websocket_handler)))

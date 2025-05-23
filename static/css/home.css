@@ -179,7 +179,7 @@ li.liste_collegue:hover{
     position: fixed;
     top: 10vh;
     right: 2vw;
-    z-index: 1000;
+    z-index: 999;
   }
   
   .burger {
@@ -331,7 +331,7 @@ li.liste_collegue:hover{
     display: flex;
     flex-direction: row;
     gap: 1%;
-    margin-top: 3rem;
+    margin-top: 4rem;
 }
 .aff_room{
     position: relative;
@@ -574,3 +574,54 @@ li.liste_collegue:hover{
   transform: scale(0.98);
 }
 
+/* Version mobile (écran max 768px) */
+@media (max-width: 768px) {
+  
+  .notifications {
+    background-color: #ffffffc7;
+  }
+  .identity {
+    width: auto;
+  }
+  .mainframe {
+    margin-top: 2rem;
+  }
+  /* Onglets */
+  .tabs{
+    width: 90%;
+  }
+  .tabs button {
+    width: 100%;
+  }
+  /* conteneur principal */
+  .disp_flex {
+    flex-direction: column;
+  }
+  /* secteur avec room */
+  .aff_room {
+    width: auto;
+  }
+  .message_Sender {
+    width: 90%;
+    display: flex;
+  }
+  .message_Sender .sender_btn {
+    width: auto;
+  }
+  /* liste des rooms */
+  .list_room {
+    width: auto;
+    margin-top: 1rem;
+  }
+  .rooms_container {
+    height: 40vh;
+    overflow-y: scroll;
+  }
+  /* search */
+  .search_users {
+    flex-direction: column;
+  }
+  .right_search {
+    border-left: none;
+  }
+}

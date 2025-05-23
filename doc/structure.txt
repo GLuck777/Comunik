@@ -10,6 +10,8 @@
 
 Structure
 .
+├── admin
+│   └── online-users
 ├── app.db
 ├── Cargo.lock
 ├── Cargo.toml
@@ -20,17 +22,22 @@ Structure
 │   ├── charte_de_couleur.txt
 │   ├── comunik_MLD.sql
 │   ├── comunik_MLD.txt
+│   ├── exemple_envoi_messages.rs
 │   ├── init.txt
 │   ├── Looping1.lo1
 │   ├── Looping1.loo
 │   ├── MCD_graph.jpg
 │   ├── MLD_graph.jpg
 │   ├── MPD_graph.jpg
+│   ├── social_network_comunikMCD.looping1.jpg
+│   ├── social_network_comunikMLD.looping1.jpg
 │   ├── structure.txt
 │   ├── svg.txt
 │   └── table.isl
 ├── README.md
 ├── src
+│   ├── connection_manager.rs
+│   ├── gestion_log.rs
 │   ├── handlers.rs
 │   ├── main.rs
 │   ├── models.rs
@@ -41,6 +48,7 @@ Structure
 ├── static
 │   ├── css
 │   │   ├── access.css
+│   │   ├── bg_canvas.css
 │   │   ├── header.css
 │   │   ├── home.css
 │   │   ├── login.css
@@ -49,20 +57,29 @@ Structure
 │   │   ├── register.css
 │   │   └── style_for_all.css
 │   ├── index.html
+│   ├── js
+│   │   └── hack_er.js
 │   └── ressources
+│       ├── icons
+│       │   └── crown.png
 │       ├── logo0.jpg
 │       ├── logo1.jpg
 │       ├── logoCode.jpg
 │       ├── logoO.jpg
 │       ├── logoU.png
+│       ├── porte_blindee_left.png
+│       ├── porte_blindee.png
+│       ├── porte_blindee_right.png
 │       ├── PROJECT Comunik.lun
 │       ├── tables_comunik.pdf
 │       └── Untitled.png
 └── templates
     ├── access.html
+    ├── admin
+    │   └── online_users.html
     ├── home.html
     ├── login.html
     ├── profile.html
     └── register.html
 
-8 directories, 47 files
+13 directories, 59 files

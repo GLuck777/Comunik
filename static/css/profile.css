@@ -103,6 +103,9 @@
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
+.profile_line{
+  margin-top: 0.5rem;
+}
 
 /* TEST friendlist version chat gpt */
 #friends-container {
