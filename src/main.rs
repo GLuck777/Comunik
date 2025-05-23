@@ -125,7 +125,7 @@ async fn main() -> std::io::Result<()> {
                 CookieSessionStore::default(),
                 secret_key.clone(),
             )
-            .cookie_secure(true) // pour local, true en prod
+            .cookie_secure(false) // pour local, true en prod
             .cookie_name("comunik_session".to_string())
             .build())
             .service(web::scope("/admin").route("/online-users", web::get().to(online_users)))
